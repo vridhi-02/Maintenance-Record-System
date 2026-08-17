@@ -94,7 +94,7 @@ function Login() {
           variant="h5"
           sx={{ textAlign: 'center', mb: 3, color: '#432E54' }}
         >
-          Login In
+          LOGIN
         </Typography>
 
         <TextField
@@ -140,7 +140,7 @@ function Login() {
             },
           }}
         >
-          Login In
+          Login
         </Button>
       </Paper>
     </Box>
