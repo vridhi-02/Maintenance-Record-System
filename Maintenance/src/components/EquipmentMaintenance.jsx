@@ -29,6 +29,10 @@ function EquipmentMaintenance() {
   const [lastSelectedEquipment, setLastSelectedEquipment] = useState(null);
   const [equipmentDropdownOpen, setEquipmentDropdownOpen] = useState(false);
 
+  // Department dropdown state
+  const [departments, setDepartments] = useState([]);
+  const [selectedDepartment, setSelectedDepartment] = useState('');
+
   const [maintenanceType, setMaintenanceType] = useState('');
   const [schedule, setSchedule] = useState('');
   const [issueDescription, setIssueDescription] = useState('');
@@ -43,6 +47,13 @@ function EquipmentMaintenance() {
     axios.get('http://localhost:8081/sections')
       .then((res) => setSections(res.data))
       .catch((err) => console.error('Error fetching sections:', err));
+  }, []);
+
+  // Fetch departments for dropdown
+  useEffect(() => {
+    axios.get('http://localhost:8081/departments')
+      .then((res) => setDepartments(res.data))
+      .catch((err) => console.error('Error fetching departments:', err));
   }, []);
 
   useEffect(() => {
@@ -60,7 +71,7 @@ function EquipmentMaintenance() {
   }, [selectedSection, sections]);
 
   const handleSave = async () => {
-    if (!selectedDate || !selectedSection || !lastSelectedEquipment || !maintenanceType || !technicianName) {
+    if (!selectedDate || !selectedSection || !selectedDepartment || !lastSelectedEquipment || !maintenanceType || !technicianName) {
       setSnackbar({ open: true, message: "Please fill all required fields.", severity: 'error' });
       return;
     }
@@ -70,6 +81,7 @@ function EquipmentMaintenance() {
     const payload = {
       date: selectedDate,
       section: selectedSection,
+      department: selectedDepartment,
       equipment: lastSelectedEquipment,
       type,
       technician_name: technicianName,
@@ -110,6 +122,23 @@ function EquipmentMaintenance() {
               onChange={(e) => setSelectedDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
             />
+          </FormControl>
+
+          <FormControl sx={{ flex: '1 1 200px' }}>
+            <InputLabel id="department-label">Department</InputLabel>
+            <Select
+              labelId="department-label"
+              value={selectedDepartment}
+              label="Department"
+              onChange={(e) => setSelectedDepartment(e.target.value)}
+            >
+              <MenuItem value=""><em>Select Department</em></MenuItem>
+              {departments.map((dept) => (
+                <MenuItem key={dept.dept_Id} value={dept.dept_Name}>
+                  {dept.dept_Name}
+                </MenuItem>
+              ))}
+            </Select>
           </FormControl>
 
           <FormControl sx={{ flex: '1 1 200px' }}>

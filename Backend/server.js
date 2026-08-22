@@ -39,9 +39,49 @@ app.post('/login', (req, res) => {
   const sql = "SELECT * FROM users WHERE username = ? AND password = ?";
   db.query(sql, [username, password], (err, results) => {
     if (err) return res.status(500).json({ error: "Server error" });
+    console.error("Login query error:", err);
     if (results.length === 0) return res.status(401).json({ error: "Invalid credentials" });
     const user = results[0];
     res.json({ id: user.id, username: user.username, role: user.role });
+  });
+});
+
+// ✔ Department Management
+app.get('/departments', (req, res) => {
+  db.query("SELECT * FROM department_name", (err, data) => {
+    if (err) return res.status(500).json(err);
+    res.json(data);
+  });
+});
+
+app.post('/departments', (req, res) => {
+  const { dept_Name, remark } = req.body;
+  if (!dept_Name) return res.status(400).json({ message: "Department name is required" });
+  const sql = "INSERT INTO department_name (dept_Name, remark) VALUES (?, ?)";
+  db.query(sql, [dept_Name, remark || ''], (err, result) => {
+    if (err) return res.status(500).json(err);
+    res.status(201).json({ id: result.insertId, dept_Name, remark: remark || '' });
+  });
+});
+
+app.put('/departments/:id', (req, res) => {
+  const { id } = req.params;
+  const { dept_Name, remark } = req.body;
+  if (!dept_Name) return res.status(400).json({ message: "Department name is required" });
+  const sql = "UPDATE department_name SET dept_Name = ?, remark = ? WHERE dept_Id = ?";
+  db.query(sql, [dept_Name, remark || '', id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: "Department updated successfully" });
+  });
+});
+
+app.delete('/departments/:id', (req, res) => {
+  const { id } = req.params;
+  const sql = "DELETE FROM department_name WHERE dept_Id = ?";
+  db.query(sql, [id], (err, result) => {
+    if (err) return res.status(500).json(err);
+    if (result.affectedRows === 0) return res.status(404).json({ message: "Department not found" });
+    res.json({ message: "Department deleted successfully" });
   });
 });
 
@@ -120,13 +160,13 @@ app.delete('/equipment/:id', (req, res) => {
 // ✔ Maintenance Records (PM & CM)
 app.post('/maintenance-records', (req, res) => {
   const {
-    date, section, equipment, type,
+    date, section, department, equipment, type,
     issue_description, action_taken, remark,
     frequency, task_description, details,
     technician_name
   } = req.body;
 
-  if (!date || !section || !equipment || !type || !technician_name) {
+  if (!date || !section || !department || !equipment || !type || !technician_name) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
@@ -140,15 +180,15 @@ app.post('/maintenance-records', (req, res) => {
 
   const sql = `
     INSERT INTO \`maintenance record\` (
-      \`date\`, section, equipment, \`type\`,
+      \`date\`, section, department, equipment, \`type\`,
       issue_description, action_taken, remark,
       frequency, task_description, details, technician_name
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   const values = [
-    date, section, equipment, type,
+    date, section, department, equipment, type,
     issue_description || '', action_taken || '', remark || '',
     frequency || '', task_description || '', details || '',
     technician_name
