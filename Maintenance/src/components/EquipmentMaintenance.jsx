@@ -9,45 +9,45 @@ import {
   MenuItem,
   TextField,
   Checkbox,
-  Radio,
-  RadioGroup,
-  FormLabel,
-  FormControlLabel,
   Snackbar,
-  Alert
+  Alert,
+  Button,
+  Autocomplete
 } from '@mui/material';
 
-import PreventiveMaintenance from './PreventiveMaintenance';
-import CorrectiveMaintenance from './CorrectiveMaintenance';
+const TYPE_OF_WORK_OPTIONS = ['PM', 'CM', 'SERVICE', 'Installation'];
+const HRS_OPTIONS = ['1', '2', '3'];
+const RATE_PER_HOUR = 400; // ₹400 per hour, used to auto-fill Amount from HRS
 
 function EquipmentMaintenance() {
   const [selectedDate, setSelectedDate] = useState('');
-  const [selectedSection, setSelectedSection] = useState('');
-  const [sections, setSections] = useState([]);
-  const [equipmentOptions, setEquipmentOptions] = useState([]);
-  const [selectedEquipment, setSelectedEquipment] = useState([]);
-  const [lastSelectedEquipment, setLastSelectedEquipment] = useState(null);
-  const [equipmentDropdownOpen, setEquipmentDropdownOpen] = useState(false);
+
+  // Machinery dropdown state (filtered by the selected Department).
+  const [machineryList, setMachineryList] = useState([]);
+  const [selectedMachinery, setSelectedMachinery] = useState([]);
+  const [lastSelectedMachinery, setLastSelectedMachinery] = useState(null);
+  const [machineryDropdownOpen, setMachineryDropdownOpen] = useState(false);
 
   // Department dropdown state
   const [departments, setDepartments] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState('');
 
-  const [maintenanceType, setMaintenanceType] = useState('');
-  const [schedule, setSchedule] = useState('');
-  const [issueDescription, setIssueDescription] = useState('');
-  const [actionTaken, setActionTaken] = useState('');
-  const [technicianName, setTechnicianName] = useState('');
+  // Machine Number dropdown state (filtered by the selected Machinery)
+  const [machineNumberOptions, setMachineNumberOptions] = useState([]);
+  const [selectedMachineNumber, setSelectedMachineNumber] = useState('');
+
+  // Category dropdown state (independent master list)
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+
+  // Work details
+  const [typeOfWork, setTypeOfWork] = useState('');
+  const [workDetails, setWorkDetails] = useState('');
+  const [hrs, setHrs] = useState('1'); // dropdown of 1/2/3, but user can type a custom value too
+  const [amount, setAmount] = useState(String(RATE_PER_HOUR)); // auto-fills from hrs, user can overwrite
   const [remark, setRemark] = useState('');
-  const [taskDescription, setTaskDescription] = useState('');
 
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-
-  useEffect(() => {
-    axios.get('http://localhost:8081/sections')
-      .then((res) => setSections(res.data))
-      .catch((err) => console.error('Error fetching sections:', err));
-  }, []);
 
   // Fetch departments for dropdown
   useEffect(() => {
@@ -56,42 +56,74 @@ function EquipmentMaintenance() {
       .catch((err) => console.error('Error fetching departments:', err));
   }, []);
 
+  // Fetch categories for dropdown (independent of machinery/department)
   useEffect(() => {
-    if (!selectedSection) {
-      setEquipmentOptions([]);
+    axios.get('http://localhost:8081/categories')
+      .then((res) => setCategories(res.data))
+      .catch((err) => console.error('Error fetching categories:', err));
+  }, []);
+
+  // Fetch machinery whenever the selected Department changes
+  useEffect(() => {
+    if (!selectedDepartment) {
+      setMachineryList([]);
       return;
     }
 
-    const sectionObj = sections.find(s => s.section_name === selectedSection);
-    if (!sectionObj) return;
+    const deptObj = departments.find(d => d.dept_Name === selectedDepartment);
+    if (!deptObj) return;
 
-    axios.get(`http://localhost:8081/equipment?section_id=${sectionObj.id}`)
-      .then((res) => setEquipmentOptions(res.data.map(item => item.equipment_name)))
-      .catch((err) => console.error('Error fetching equipment:', err));
-  }, [selectedSection, sections]);
+    axios.get(`http://localhost:8081/machinery?department_id=${deptObj.dept_Id}`)
+      .then((res) => setMachineryList(res.data))
+      .catch((err) => console.error('Error fetching machinery:', err));
+  }, [selectedDepartment, departments]);
+
+  // Fetch machine numbers whenever the last selected Machinery changes
+  useEffect(() => {
+    setSelectedMachineNumber('');
+    if (!lastSelectedMachinery) {
+      setMachineNumberOptions([]);
+      return;
+    }
+
+    const machineryObj = machineryList.find(m => m.machinery_name === lastSelectedMachinery);
+    if (!machineryObj) {
+      setMachineNumberOptions([]);
+      return;
+    }
+
+    axios.get(`http://localhost:8081/machine-numbers?machinery_id=${machineryObj.id}`)
+      .then((res) => setMachineNumberOptions(res.data))
+      .catch((err) => console.error('Error fetching machine numbers:', err));
+  }, [lastSelectedMachinery, machineryList]);
+
+  // Auto-fill Amount from HRS × rate whenever HRS changes.
+  // The Amount field itself stays freely editable afterwards.
+  const handleHrsChange = (newHrsValue) => {
+    setHrs(newHrsValue);
+    const numericHrs = parseFloat(newHrsValue);
+    if (!isNaN(numericHrs)) {
+      setAmount(String(numericHrs * RATE_PER_HOUR));
+    }
+  };
 
   const handleSave = async () => {
-    if (!selectedDate || !selectedSection || !selectedDepartment || !lastSelectedEquipment || !maintenanceType || !technicianName) {
+    if (!selectedDate || !selectedDepartment || !lastSelectedMachinery || !typeOfWork) {
       setSnackbar({ open: true, message: "Please fill all required fields.", severity: 'error' });
       return;
     }
 
-    const type = maintenanceType === 'Preventive Maintenance (PM)' ? 'PM' : 'CM';
-
     const payload = {
       date: selectedDate,
-      section: selectedSection,
       department: selectedDepartment,
-      equipment: lastSelectedEquipment,
-      type,
-      technician_name: technicianName,
-      frequency: type === 'PM' ? schedule : '',
-      task_description: type === 'PM' ? taskDescription.tasks?.join(', ') || '' : '',
-      details: type === 'PM' ? taskDescription.details || '' : '',
-      notes: type === 'PM' ? taskDescription.notes || '' : '',
-      issue_description: type === 'CM' ? issueDescription : '',
-      action_taken: type === 'CM' ? actionTaken : '',
-      remark: type === 'CM' ? remark : '',
+      equipment: lastSelectedMachinery, // maintenance record table still uses the "equipment" column
+      machine_number: selectedMachineNumber,
+      category: selectedCategory,
+      type_of_work: typeOfWork,
+      work_details: workDetails,
+      hrs: parseFloat(hrs) || 0,
+      amount: parseFloat(amount) || 0,
+      remark,
     };
 
     try {
@@ -109,7 +141,7 @@ function EquipmentMaintenance() {
   return (
     <>
       <Typography variant="h5" align="center" gutterBottom color="#872341">
-        Equipment Maintenance(PM & CM)
+        Equipment Maintenance
       </Typography>
 
       <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 3, p: 2, bgcolor: '#FEFBF6', borderRadius: 3, boxShadow: 4 }}>
@@ -130,7 +162,11 @@ function EquipmentMaintenance() {
               labelId="department-label"
               value={selectedDepartment}
               label="Department"
-              onChange={(e) => setSelectedDepartment(e.target.value)}
+              onChange={(e) => {
+                setSelectedDepartment(e.target.value);
+                setSelectedMachinery([]);
+                setLastSelectedMachinery(null);
+              }}
             >
               <MenuItem value=""><em>Select Department</em></MenuItem>
               {departments.map((dept) => (
@@ -141,51 +177,63 @@ function EquipmentMaintenance() {
             </Select>
           </FormControl>
 
-          <FormControl sx={{ flex: '1 1 200px' }}>
-            <InputLabel id="section-label">Section</InputLabel>
+          <FormControl sx={{ flex: '1 1 200px' }} disabled={!selectedDepartment}>
+            <InputLabel id="machinery-label">Machinery</InputLabel>
             <Select
-              labelId="section-label"
-              value={selectedSection}
-              label="Section"
+              labelId="machinery-label"
+              multiple
+              label="Machinery"
+              open={machineryDropdownOpen}
+              onOpen={() => setMachineryDropdownOpen(true)}
+              onClose={() => setMachineryDropdownOpen(false)}
+              value={selectedMachinery}
               onChange={(e) => {
-                setSelectedSection(e.target.value);
-                setSelectedEquipment([]);
-                setMaintenanceType('');
+                const selected = e.target.value;
+                const latest = selected[selected.length - 1];
+                setSelectedMachinery(selected);
+                setLastSelectedMachinery(latest);
+                setMachineryDropdownOpen(false);
               }}
+              renderValue={(selected) => selected.join(', ')}
             >
-              <MenuItem value=""><em>Select Section</em></MenuItem>
-              {sections.map((section) => (
-                <MenuItem key={section.id} value={section.section_name}>
-                  {section.section_name}
+              {machineryList.map((machinery) => (
+                <MenuItem key={machinery.id} value={machinery.machinery_name}>
+                  <Checkbox checked={selectedMachinery.includes(machinery.machinery_name)} />
+                  {machinery.machinery_name}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
 
-          <FormControl sx={{ flex: '1 1 200px' }} disabled={!selectedSection}>
-            <InputLabel id="equipment-label">Equipment</InputLabel>
+          <FormControl sx={{ flex: '1 1 200px' }} disabled={!lastSelectedMachinery}>
+            <InputLabel id="machine-number-label">Machine Number</InputLabel>
             <Select
-              labelId="equipment-label"
-              multiple
-              label="Equipment"
-              open={equipmentDropdownOpen}
-              onOpen={() => setEquipmentDropdownOpen(true)}
-              onClose={() => setEquipmentDropdownOpen(false)}
-              value={selectedEquipment}
-              onChange={(e) => {
-                const selected = e.target.value;
-                const latest = selected[selected.length - 1];
-                setSelectedEquipment(selected);
-                setLastSelectedEquipment(latest);
-                setMaintenanceType('');
-                setEquipmentDropdownOpen(false); // auto-close after selection
-              }}
-              renderValue={(selected) => selected.join(', ')}
+              labelId="machine-number-label"
+              value={selectedMachineNumber}
+              label="Machine Number"
+              onChange={(e) => setSelectedMachineNumber(e.target.value)}
             >
-              {equipmentOptions.map((equipment) => (
-                <MenuItem key={equipment} value={equipment}>
-                  <Checkbox checked={selectedEquipment.includes(equipment)} />
-                  {equipment}
+              <MenuItem value=""><em>Select Machine Number</em></MenuItem>
+              {machineNumberOptions.map((mn) => (
+                <MenuItem key={mn.id} value={mn.machine_number}>
+                  {mn.machine_number}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl sx={{ flex: '1 1 200px' }}>
+            <InputLabel id="category-label">Category</InputLabel>
+            <Select
+              labelId="category-label"
+              value={selectedCategory}
+              label="Category"
+              onChange={(e) => setSelectedCategory(e.target.value)}
+            >
+              <MenuItem value=""><em>Select Category</em></MenuItem>
+              {categories.map((cat) => (
+                <MenuItem key={cat.id} value={cat.category_name}>
+                  {cat.category_name}
                 </MenuItem>
               ))}
             </Select>
@@ -194,53 +242,67 @@ function EquipmentMaintenance() {
       </Box>
 
       <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 4, p: 2, bgcolor: '#FEFBF6', borderRadius: 3, boxShadow: 4 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', color: '#000B58' }}>
-          <FormControl sx={{ flex: 1 }} disabled={selectedEquipment.length === 0}>
-            <FormLabel sx={{ fontSize: 22, paddingBottom: 1 }}>Type</FormLabel>
-            <RadioGroup
-              row
-              value={maintenanceType}
-              onChange={(e) => setMaintenanceType(e.target.value)}
-              sx={{ gap: 15 }}
-            >
-              <FormControlLabel
-                value="Preventive Maintenance (PM)"
-                control={<Radio />}
-                label="Preventive Maintenance (PM)"
-              />
-              <FormControlLabel
-                value="Corrective Maintenance (CM)"
-                control={<Radio />}
-                label="Corrective Maintenance (CM)"
-              />
-            </RadioGroup>
-          </FormControl>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, color: '#000B58' }}>
+          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            <FormControl sx={{ flex: '1 1 200px' }}>
+              <InputLabel id="type-of-work-label">Type of Work</InputLabel>
+              <Select
+                labelId="type-of-work-label"
+                value={typeOfWork}
+                label="Type of Work"
+                onChange={(e) => setTypeOfWork(e.target.value)}
+              >
+                <MenuItem value=""><em>Select Type of Work</em></MenuItem>
+                {TYPE_OF_WORK_OPTIONS.map((opt) => (
+                  <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
-          {maintenanceType === 'Preventive Maintenance (PM)' && (
-            <PreventiveMaintenance
-              section={selectedSection}
-              equipment={lastSelectedEquipment}
-              schedule={schedule}
-              setSchedule={setSchedule}
-              taskDescription={taskDescription}
-              setTaskDescription={setTaskDescription}
+            <TextField
+              sx={{ flex: '2 1 300px' }}
+              label="Work Details"
+              value={workDetails}
+              onChange={(e) => setWorkDetails(e.target.value)}
             />
-          )}
 
-          {maintenanceType === 'Corrective Maintenance (CM)' && (
-            <CorrectiveMaintenance
-              section={selectedSection}
-              equipment={lastSelectedEquipment}
-              issueDescription={issueDescription}
-              setIssueDescription={setIssueDescription}
-              actionTaken={actionTaken}
-              setActionTaken={setActionTaken}
-              remark={remark}
-              setRemark={setRemark}
-              technicianName={technicianName}
-              setTechnicianName={setTechnicianName}
+            {/* HRS: dropdown of 1/2/3, but freeSolo lets the user type any custom value */}
+            <Autocomplete
+              freeSolo
+              sx={{ flex: '1 1 150px' }}
+              options={HRS_OPTIONS}
+              value={hrs}
+              onChange={(e, newValue) => handleHrsChange(newValue ?? '')}
+              onInputChange={(e, newInputValue) => handleHrsChange(newInputValue)}
+              renderInput={(params) => (
+                <TextField {...params} label="HRS" />
+              )}
             />
-          )}
+
+            {/* Amount: auto-fills from HRS × rate, but stays freely editable */}
+            <TextField
+              sx={{ flex: '1 1 150px' }}
+              label="Amount"
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              helperText={`Auto: HRS × ₹${RATE_PER_HOUR}`}
+            />
+          </Box>
+
+          <TextField
+            label="Remark"
+            value={remark}
+            onChange={(e) => setRemark(e.target.value)}
+            multiline
+            minRows={2}
+          />
+
+          <Box>
+            <Button variant="contained" onClick={handleSave}>
+              Save
+            </Button>
+          </Box>
         </Box>
       </Box>
 

@@ -124,74 +124,100 @@ app.delete('/sections/:id', (req, res) => {
   });
 });
 
-// ✔ Equipment Management
-app.get('/equipment', (req, res) => {
-  let { section_id } = req.query;
-  if (!section_id) return res.status(400).json({ error: "Missing section_id parameter" });
-  if (!Array.isArray(section_id)) section_id = [section_id];
-  const placeholders = section_id.map(() => '?').join(',');
-  const sql = `SELECT * FROM equipment WHERE section_id IN (${placeholders})`;
-  db.query(sql, section_id, (err, results) => {
+// ✔ Machinery Management (filtered by department, not section)
+app.get('/machinery', (req, res) => {
+  const { department_id } = req.query;
+  if (!department_id) return res.status(400).json({ error: "Missing department_id parameter" });
+  const sql = "SELECT * FROM machinery_name WHERE department_id = ?";
+  db.query(sql, [department_id], (err, results) => {
     if (err) return res.status(500).json({ error: "Database error", details: err });
     res.json(results);
   });
 });
 
-app.post('/equipment', (req, res) => {
-  const { equipment_name, section_id } = req.body;
-  if (!equipment_name || !section_id) return res.status(400).json({ message: "Fields are required" });
-  const sql = "INSERT INTO equipment (equipment_name, section_id) VALUES (?, ?)";
-  db.query(sql, [equipment_name, section_id], (err, result) => {
+app.post('/machinery', (req, res) => {
+  const { machinery_name, department_id } = req.body;
+  if (!machinery_name) return res.status(400).json({ message: "Machinery name is required" });
+  const sql = "INSERT INTO machinery_name (machinery_name, department_id) VALUES (?, ?)";
+  db.query(sql, [machinery_name, department_id || null], (err, result) => {
     if (err) return res.status(500).json({ error: "Database error", details: err });
-    res.status(201).json({ message: "Equipment added", id: result.insertId });
+    res.status(201).json({ message: "Machinery added", id: result.insertId });
   });
 });
 
-app.delete('/equipment/:id', (req, res) => {
+app.delete('/machinery/:id', (req, res) => {
   const { id } = req.params;
-  const sql = "DELETE FROM equipment WHERE id = ?";
+  const sql = "DELETE FROM machinery_name WHERE id = ?";
   db.query(sql, [id], (err, result) => {
     if (err) return res.status(500).json({ error: "Database error", details: err });
-    if (result.affectedRows === 0) return res.status(404).json({ message: "Equipment not found" });
-    res.json({ message: "Equipment deleted successfully" });
+    if (result.affectedRows === 0) return res.status(404).json({ message: "Machinery not found" });
+    res.json({ message: "Machinery deleted successfully" });
   });
 });
 
-// ✔ Maintenance Records (PM & CM)
+// ✔ Category Management (independent master list)
+app.get('/categories', (req, res) => {
+  db.query("SELECT * FROM category ORDER BY category_name", (err, data) => {
+    if (err) return res.status(500).json(err);
+    res.json(data);
+  });
+});
+
+// ✔ Machine Number Management (linked to a specific machinery_id)
+app.get('/machine-numbers', (req, res) => {
+  const { machinery_id } = req.query;
+  if (!machinery_id) return res.status(400).json({ error: "Missing machinery_id parameter" });
+  const sql = "SELECT * FROM machine_number WHERE machinery_id = ?";
+  db.query(sql, [machinery_id], (err, results) => {
+    if (err) return res.status(500).json({ error: "Database error", details: err });
+    res.json(results);
+  });
+});
+
+app.post('/machine-numbers', (req, res) => {
+  const { machine_number, machinery_id } = req.body;
+  if (!machine_number || !machinery_id) {
+    return res.status(400).json({ message: "machine_number and machinery_id are required" });
+  }
+  const sql = "INSERT INTO machine_number (machine_number, machinery_id) VALUES (?, ?)";
+  db.query(sql, [machine_number, machinery_id], (err, result) => {
+    if (err) return res.status(500).json({ error: "Database error", details: err });
+    res.status(201).json({ message: "Machine number added", id: result.insertId });
+  });
+});
+
+app.delete('/machine-numbers/:id', (req, res) => {
+  const { id } = req.params;
+  const sql = "DELETE FROM machine_number WHERE id = ?";
+  db.query(sql, [id], (err, result) => {
+    if (err) return res.status(500).json({ error: "Database error", details: err });
+    if (result.affectedRows === 0) return res.status(404).json({ message: "Machine number not found" });
+    res.json({ message: "Machine number deleted successfully" });
+  });
+});
+
+// ✔ Maintenance Records
 app.post('/maintenance-records', (req, res) => {
   const {
-    date, section, department, equipment, type,
-    issue_description, action_taken, remark,
-    frequency, task_description, details,
-    technician_name
+    date, department, equipment, machine_number, category,
+    type_of_work, work_details, hrs, amount, remark
   } = req.body;
 
-  if (!date || !section || !department || !equipment || !type || !technician_name) {
+  if (!date || !department || !equipment || !type_of_work) {
     return res.status(400).json({ message: "Missing required fields" });
-  }
-
-  if (type === 'CM' && (!issue_description || !action_taken || !remark)) {
-    return res.status(400).json({ message: "Missing CM fields" });
-  }
-
-  if (type === 'PM' && (!frequency || !task_description || !details)) {
-    return res.status(400).json({ message: "Missing PM fields" });
   }
 
   const sql = `
     INSERT INTO \`maintenance record\` (
-      \`date\`, section, department, equipment, \`type\`,
-      issue_description, action_taken, remark,
-      frequency, task_description, details, technician_name
+      \`date\`, department, equipment, machine_number, category,
+      type_of_work, work_details, hrs, amount, remark
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   const values = [
-    date, section, department, equipment, type,
-    issue_description || '', action_taken || '', remark || '',
-    frequency || '', task_description || '', details || '',
-    technician_name
+    date, department, equipment, machine_number || '', category || '',
+    type_of_work, work_details || '', hrs || 1, amount || 0, remark || ''
   ];
 
   db.query(sql, values, (err, result) => {
@@ -201,11 +227,7 @@ app.post('/maintenance-records', (req, res) => {
 });
 
 app.get('/maintenance-records', (req, res) => {
-  const { type } = req.query;
-  const sql = type
-    ? 'SELECT * FROM `maintenance record` WHERE type = ?'
-    : 'SELECT * FROM `maintenance record`';
-  db.query(sql, type ? [type] : [], (err, results) => {
+  db.query('SELECT * FROM `maintenance record`', (err, results) => {
     if (err) return res.status(500).json({ message: "Database error", error: err });
     res.json(results);
   });
