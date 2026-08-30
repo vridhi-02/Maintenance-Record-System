@@ -233,6 +233,46 @@ app.get('/maintenance-records', (req, res) => {
   });
 });
 
+app.put('/maintenance-records/:id', (req, res) => {
+  const { id } = req.params;
+  const {
+    date, department, equipment, machine_number, category,
+    type_of_work, work_details, hrs, amount, remark
+  } = req.body;
+
+  if (!date || !department || !equipment || !type_of_work) {
+    return res.status(400).json({ message: "Missing required fields" });
+  }
+
+  const sql = `
+    UPDATE \`maintenance record\` SET
+      \`date\` = ?, department = ?, equipment = ?, machine_number = ?, category = ?,
+      type_of_work = ?, work_details = ?, hrs = ?, amount = ?, remark = ?
+    WHERE id = ?
+  `;
+
+  const values = [
+    date, department, equipment, machine_number || '', category || '',
+    type_of_work, work_details || '', hrs || 1, amount || 0, remark || '', id
+  ];
+
+  db.query(sql, values, (err, result) => {
+    if (err) return res.status(500).json({ message: "Database error", error: err });
+    if (result.affectedRows === 0) return res.status(404).json({ message: "Maintenance record not found" });
+    res.json({ message: "Maintenance record updated successfully" });
+  });
+});
+
+app.delete('/maintenance-records/:id', (req, res) => {
+  const { id } = req.params;
+  const sql = "DELETE FROM `maintenance record` WHERE id = ?";
+  db.query(sql, [id], (err, result) => {
+    if (err) return res.status(500).json({ message: "Database error", error: err });
+    if (result.affectedRows === 0) return res.status(404).json({ message: "Maintenance record not found" });
+    res.json({ message: "Maintenance record deleted successfully" });
+  });
+});
+
 // ✔ Equipment Name table
 app.post('/equipment-name', (req, res) => {
   const {
@@ -300,14 +340,10 @@ app.post('/add-equipment', (req, res) => {
   });
 });
 // ✔ Get all water testing records
-// ✔ Get all water testing records
 app.get('/water-testing', (req, res) => {
-  const sql = "SELECT * FROM `water_testing` ORDER BY `Date` DESC";
+  const sql = "SELECT * FROM `water testing` ORDER BY Date DESC";
   db.query(sql, (err, results) => {
-    if (err) {
-      console.error("water-testing GET error:", err);
-      return res.status(500).json({ message: "Database error" });
-    }
+    if (err) return res.status(500).json({ message: "Database error", error: err });
     res.json(results);
   });
 });
@@ -321,7 +357,7 @@ app.post('/water-testing', (req, res) => {
   }
 
   const sql = `
-    INSERT INTO \`water_testing\`
+    INSERT INTO \`water testing\` 
     (Date, Location_testpoint, TDS, hardness, Comments_actiontaken, Remark)
     VALUES (?, ?, ?, ?, ?, ?)
   `;
@@ -330,10 +366,7 @@ app.post('/water-testing', (req, res) => {
     sql,
     [Date, Location_testpoint, TDS, hardness, Comments_actiontaken || "", Remark || ""],
     (err, result) => {
-      if (err) {
-        console.error("water-testing POST error:", err);
-        return res.status(500).json({ message: "Database error" });
-      }
+      if (err) return res.status(500).json({ message: "Database error", error: err });
       res.status(201).json({ message: "Water test record added", id: result.insertId });
     }
   );

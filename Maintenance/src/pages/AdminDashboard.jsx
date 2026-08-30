@@ -174,8 +174,9 @@ function AdminDashboard() {
         </Box>
       </Box>
 
-      {/* Main Content */}
-      <Box sx={{ flex: 1, minWidth: 0 }}>
+      {/* Main Content — its own scroll container, since html/body/#root
+          have overflow:hidden (see App.css) to keep the sidebar fixed. */}
+      <Box sx={{ flex: 1, minWidth: 0, height: '100vh', overflowY: 'auto' }}>
         <Box
           sx={{
             position: 'sticky',
