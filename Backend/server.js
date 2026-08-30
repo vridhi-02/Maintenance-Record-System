@@ -300,10 +300,14 @@ app.post('/add-equipment', (req, res) => {
   });
 });
 // ✔ Get all water testing records
+// ✔ Get all water testing records
 app.get('/water-testing', (req, res) => {
-  const sql = "SELECT * FROM `water testing` ORDER BY Date DESC";
+  const sql = "SELECT * FROM `water_testing` ORDER BY `Date` DESC";
   db.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ message: "Database error", error: err });
+    if (err) {
+      console.error("water-testing GET error:", err);
+      return res.status(500).json({ message: "Database error" });
+    }
     res.json(results);
   });
 });
@@ -317,7 +321,7 @@ app.post('/water-testing', (req, res) => {
   }
 
   const sql = `
-    INSERT INTO \`water testing\` 
+    INSERT INTO \`water_testing\`
     (Date, Location_testpoint, TDS, hardness, Comments_actiontaken, Remark)
     VALUES (?, ?, ?, ?, ?, ?)
   `;
@@ -326,7 +330,10 @@ app.post('/water-testing', (req, res) => {
     sql,
     [Date, Location_testpoint, TDS, hardness, Comments_actiontaken || "", Remark || ""],
     (err, result) => {
-      if (err) return res.status(500).json({ message: "Database error", error: err });
+      if (err) {
+        console.error("water-testing POST error:", err);
+        return res.status(500).json({ message: "Database error" });
+      }
       res.status(201).json({ message: "Water test record added", id: result.insertId });
     }
   );

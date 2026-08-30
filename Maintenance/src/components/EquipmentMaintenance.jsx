@@ -2,31 +2,65 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import {
   Box,
+  Card,
+  Grid,
+  Stack,
   Typography,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
   TextField,
-  Checkbox,
   Snackbar,
   Alert,
   Button,
-  Autocomplete
+  Autocomplete,
+  Divider,
 } from '@mui/material';
+import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import { tokens } from './theme';
 
-const TYPE_OF_WORK_OPTIONS = ['PM', 'CM', 'SERVICE', 'Installation'];
+const TYPE_OF_WORK_OPTIONS = ['PM', 'CM', 'Service', 'Installation'];
 const HRS_OPTIONS = ['1', '2', '3'];
 const RATE_PER_HOUR = 400; // ₹400 per hour, used to auto-fill Amount from HRS
 
-function EquipmentMaintenance() {
-  const [selectedDate, setSelectedDate] = useState('');
+// Returns today's date as "YYYY-MM-DD", which is what a <input type="date"> expects.
+const getTodayDate = () => new Date().toISOString().split('T')[0];
 
-  // Machinery dropdown state (filtered by the selected Department).
+// Small section header: icon chip + title + hairline rule, so the form
+// visually separates "what machine" from "what was done to it".
+function SectionHeader({ icon, title }) {
+  return (
+    <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 2.5 }}>
+      <Box
+        sx={{
+          width: 32,
+          height: 32,
+          borderRadius: '9px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: tokens.amberTint,
+          color: tokens.amberDark,
+        }}
+      >
+        {icon}
+      </Box>
+      <Typography variant="subtitle1" sx={{ color: tokens.ink }}>
+        {title}
+      </Typography>
+    </Stack>
+  );
+}
+
+function EquipmentMaintenance() {
+  // Defaults to today; the field is still editable if the user needs to backdate an entry.
+  const [selectedDate, setSelectedDate] = useState(getTodayDate());
+
+  // Machinery dropdown state (filtered by the selected Department). Single-select.
   const [machineryList, setMachineryList] = useState([]);
-  const [selectedMachinery, setSelectedMachinery] = useState([]);
-  const [lastSelectedMachinery, setLastSelectedMachinery] = useState(null);
-  const [machineryDropdownOpen, setMachineryDropdownOpen] = useState(false);
+  const [selectedMachinery, setSelectedMachinery] = useState('');
 
   // Department dropdown state
   const [departments, setDepartments] = useState([]);
@@ -70,7 +104,7 @@ function EquipmentMaintenance() {
       return;
     }
 
-    const deptObj = departments.find(d => d.dept_Name === selectedDepartment);
+    const deptObj = departments.find((d) => d.dept_Name === selectedDepartment);
     if (!deptObj) return;
 
     axios.get(`http://localhost:8081/machinery?department_id=${deptObj.dept_Id}`)
@@ -78,15 +112,15 @@ function EquipmentMaintenance() {
       .catch((err) => console.error('Error fetching machinery:', err));
   }, [selectedDepartment, departments]);
 
-  // Fetch machine numbers whenever the last selected Machinery changes
+  // Fetch machine numbers whenever the selected Machinery changes
   useEffect(() => {
     setSelectedMachineNumber('');
-    if (!lastSelectedMachinery) {
+    if (!selectedMachinery) {
       setMachineNumberOptions([]);
       return;
     }
 
-    const machineryObj = machineryList.find(m => m.machinery_name === lastSelectedMachinery);
+    const machineryObj = machineryList.find((m) => m.machinery_name === selectedMachinery);
     if (!machineryObj) {
       setMachineNumberOptions([]);
       return;
@@ -95,7 +129,7 @@ function EquipmentMaintenance() {
     axios.get(`http://localhost:8081/machine-numbers?machinery_id=${machineryObj.id}`)
       .then((res) => setMachineNumberOptions(res.data))
       .catch((err) => console.error('Error fetching machine numbers:', err));
-  }, [lastSelectedMachinery, machineryList]);
+  }, [selectedMachinery, machineryList]);
 
   // Auto-fill Amount from HRS × rate whenever HRS changes.
   // The Amount field itself stays freely editable afterwards.
@@ -108,15 +142,15 @@ function EquipmentMaintenance() {
   };
 
   const handleSave = async () => {
-    if (!selectedDate || !selectedDepartment || !lastSelectedMachinery || !typeOfWork) {
-      setSnackbar({ open: true, message: "Please fill all required fields.", severity: 'error' });
+    if (!selectedDate || !selectedDepartment || !selectedMachinery || !typeOfWork) {
+      setSnackbar({ open: true, message: 'Please fill all required fields.', severity: 'error' });
       return;
     }
 
     const payload = {
       date: selectedDate,
       department: selectedDepartment,
-      equipment: lastSelectedMachinery, // maintenance record table still uses the "equipment" column
+      equipment: selectedMachinery, // maintenance record table still uses the "equipment" column
       machine_number: selectedMachineNumber,
       category: selectedCategory,
       type_of_work: typeOfWork,
@@ -130,181 +164,217 @@ function EquipmentMaintenance() {
       const res = await axios.post('http://localhost:8081/maintenance-records', payload);
 
       if (res.status === 201) {
-        setSnackbar({ open: true, message: '✅ Maintenance record saved successfully!', severity: 'success' });
+        setSnackbar({ open: true, message: 'Maintenance record saved successfully!', severity: 'success' });
       }
     } catch (err) {
       console.error(err?.response?.data || err.message);
-      setSnackbar({ open: true, message: '❌ Failed to save maintenance record.', severity: 'error' });
+      setSnackbar({ open: true, message: 'Failed to save maintenance record.', severity: 'error' });
     }
   };
 
   return (
-    <>
-      <Typography variant="h5" align="center" gutterBottom color="#872341">
-        Equipment Maintenance
-      </Typography>
+    <Box sx={{ maxWidth: 1080, mx: 'auto' }}>
+      <Stack spacing={3}>
+        {/* Section 1 — what machine, where */}
+        <Card
+          sx={{
+            p: { xs: 2.5, md: 3.5 },
+            borderRadius: '16px',
+            border: `1px solid ${tokens.line}`,
+            boxShadow: '0 1px 2px rgba(38,33,27,0.04)',
+          }}
+        >
+          <SectionHeader icon={<PrecisionManufacturingIcon fontSize="small" />} title="Equipment & Location" />
 
-      <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 3, p: 2, bgcolor: '#FEFBF6', borderRadius: 3, boxShadow: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 3, flexWrap: 'wrap' }}>
-          <FormControl sx={{ flex: '1 1 200px' }}>
-            <TextField
-              label="Date"
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
-          </FormControl>
+          <Grid container spacing={2.5}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <TextField
+                fullWidth
+                label="Date"
+                required
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
 
-          <FormControl sx={{ flex: '1 1 200px' }}>
-            <InputLabel id="department-label">Department</InputLabel>
-            <Select
-              labelId="department-label"
-              value={selectedDepartment}
-              label="Department"
-              onChange={(e) => {
-                setSelectedDepartment(e.target.value);
-                setSelectedMachinery([]);
-                setLastSelectedMachinery(null);
-              }}
-            >
-              <MenuItem value=""><em>Select Department</em></MenuItem>
-              {departments.map((dept) => (
-                <MenuItem key={dept.dept_Id} value={dept.dept_Name}>
-                  {dept.dept_Name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <FormControl fullWidth required>
+                <InputLabel id="department-label">Department</InputLabel>
+                <Select
+                  labelId="department-label"
+                  value={selectedDepartment}
+                  label="Department"
+                  onChange={(e) => {
+                    setSelectedDepartment(e.target.value);
+                    setSelectedMachinery('');
+                  }}
+                >
+                  <MenuItem value="">
+                    <em>Select Department</em>
+                  </MenuItem>
+                  {departments.map((dept) => (
+                    <MenuItem key={dept.dept_Id} value={dept.dept_Name}>
+                      {dept.dept_Name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
 
-          <FormControl sx={{ flex: '1 1 200px' }} disabled={!selectedDepartment}>
-            <InputLabel id="machinery-label">Machinery</InputLabel>
-            <Select
-              labelId="machinery-label"
-              multiple
-              label="Machinery"
-              open={machineryDropdownOpen}
-              onOpen={() => setMachineryDropdownOpen(true)}
-              onClose={() => setMachineryDropdownOpen(false)}
-              value={selectedMachinery}
-              onChange={(e) => {
-                const selected = e.target.value;
-                const latest = selected[selected.length - 1];
-                setSelectedMachinery(selected);
-                setLastSelectedMachinery(latest);
-                setMachineryDropdownOpen(false);
-              }}
-              renderValue={(selected) => selected.join(', ')}
-            >
-              {machineryList.map((machinery) => (
-                <MenuItem key={machinery.id} value={machinery.machinery_name}>
-                  <Checkbox checked={selectedMachinery.includes(machinery.machinery_name)} />
-                  {machinery.machinery_name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <FormControl fullWidth required disabled={!selectedDepartment}>
+                <InputLabel id="machinery-label">Machinery</InputLabel>
+                <Select
+                  labelId="machinery-label"
+                  value={selectedMachinery}
+                  label="Machinery"
+                  onChange={(e) => setSelectedMachinery(e.target.value)}
+                >
+                  <MenuItem value="">
+                    <em>Select Machinery</em>
+                  </MenuItem>
+                  {machineryList.map((machinery) => (
+                    <MenuItem key={machinery.id} value={machinery.machinery_name}>
+                      {machinery.machinery_name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
 
-          <FormControl sx={{ flex: '1 1 200px' }} disabled={!lastSelectedMachinery}>
-            <InputLabel id="machine-number-label">Machine Number</InputLabel>
-            <Select
-              labelId="machine-number-label"
-              value={selectedMachineNumber}
-              label="Machine Number"
-              onChange={(e) => setSelectedMachineNumber(e.target.value)}
-            >
-              <MenuItem value=""><em>Select Machine Number</em></MenuItem>
-              {machineNumberOptions.map((mn) => (
-                <MenuItem key={mn.id} value={mn.machine_number}>
-                  {mn.machine_number}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <FormControl fullWidth disabled={!selectedMachinery}>
+                <InputLabel id="machine-number-label">Machine Number</InputLabel>
+                <Select
+                  labelId="machine-number-label"
+                  value={selectedMachineNumber}
+                  label="Machine Number"
+                  onChange={(e) => setSelectedMachineNumber(e.target.value)}
+                >
+                  <MenuItem value="">
+                    <em>Select Machine Number</em>
+                  </MenuItem>
+                  {machineNumberOptions.map((mn) => (
+                    <MenuItem key={mn.id} value={mn.machine_number}>
+                      {mn.machine_number}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
 
-          <FormControl sx={{ flex: '1 1 200px' }}>
-            <InputLabel id="category-label">Category</InputLabel>
-            <Select
-              labelId="category-label"
-              value={selectedCategory}
-              label="Category"
-              onChange={(e) => setSelectedCategory(e.target.value)}
-            >
-              <MenuItem value=""><em>Select Category</em></MenuItem>
-              {categories.map((cat) => (
-                <MenuItem key={cat.id} value={cat.category_name}>
-                  {cat.category_name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Box>
-      </Box>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <FormControl fullWidth>
+                <InputLabel id="category-label">Category</InputLabel>
+                <Select
+                  labelId="category-label"
+                  value={selectedCategory}
+                  label="Category"
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                >
+                  <MenuItem value="">
+                    <em>Select Category</em>
+                  </MenuItem>
+                  {categories.map((cat) => (
+                    <MenuItem key={cat.id} value={cat.category_name}>
+                      {cat.category_name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </Card>
 
-      <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 4, p: 2, bgcolor: '#FEFBF6', borderRadius: 3, boxShadow: 4 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, color: '#000B58' }}>
-          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-            <FormControl sx={{ flex: '1 1 200px' }}>
-              <InputLabel id="type-of-work-label">Type of Work</InputLabel>
-              <Select
-                labelId="type-of-work-label"
-                value={typeOfWork}
-                label="Type of Work"
-                onChange={(e) => setTypeOfWork(e.target.value)}
-              >
-                <MenuItem value=""><em>Select Type of Work</em></MenuItem>
-                {TYPE_OF_WORK_OPTIONS.map((opt) => (
-                  <MenuItem key={opt} value={opt}>{opt}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+        {/* Section 2 — what was done */}
+        <Card
+          sx={{
+            p: { xs: 2.5, md: 3.5 },
+            borderRadius: '16px',
+            border: `1px solid ${tokens.line}`,
+            boxShadow: '0 1px 2px rgba(38,33,27,0.04)',
+          }}
+        >
+          <SectionHeader icon={<AssignmentIcon fontSize="small" />} title="Work Details" />
 
-            <TextField
-              sx={{ flex: '2 1 300px' }}
-              label="Work Details"
-              value={workDetails}
-              onChange={(e) => setWorkDetails(e.target.value)}
-            />
+          <Grid container spacing={2.5}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <FormControl fullWidth required>
+                <InputLabel id="type-of-work-label">Type of Work</InputLabel>
+                <Select
+                  labelId="type-of-work-label"
+                  value={typeOfWork}
+                  label="Type of Work"
+                  onChange={(e) => setTypeOfWork(e.target.value)}
+                >
+                  <MenuItem value="">
+                    <em>Select Type of Work</em>
+                  </MenuItem>
+                  {TYPE_OF_WORK_OPTIONS.map((opt) => (
+                    <MenuItem key={opt} value={opt}>
+                      {opt}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
 
-            {/* HRS: dropdown of 1/2/3, but freeSolo lets the user type any custom value */}
-            <Autocomplete
-              freeSolo
-              sx={{ flex: '1 1 150px' }}
-              options={HRS_OPTIONS}
-              value={hrs}
-              onChange={(e, newValue) => handleHrsChange(newValue ?? '')}
-              onInputChange={(e, newInputValue) => handleHrsChange(newInputValue)}
-              renderInput={(params) => (
-                <TextField {...params} label="HRS" />
-              )}
-            />
+            <Grid size={{ xs: 12, sm: 6, md: 5 }}>
+              <TextField
+                fullWidth
+                label="Work Details"
+                value={workDetails}
+                onChange={(e) => setWorkDetails(e.target.value)}
+              />
+            </Grid>
 
-            {/* Amount: auto-fills from HRS × rate, but stays freely editable */}
-            <TextField
-              sx={{ flex: '1 1 150px' }}
-              label="Amount"
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              helperText={`Auto: HRS × ₹${RATE_PER_HOUR}`}
-            />
-          </Box>
+            <Grid size={{ xs: 6, sm: 3, md: 2 }}>
+              {/* HRS: dropdown of 1/2/3, but freeSolo lets the user type any custom value */}
+              <Autocomplete
+                freeSolo
+                options={HRS_OPTIONS}
+                value={hrs}
+                onChange={(e, newValue) => handleHrsChange(newValue ?? '')}
+                onInputChange={(e, newInputValue) => handleHrsChange(newInputValue)}
+                renderInput={(params) => <TextField {...params} fullWidth label="HRS" />}
+              />
+            </Grid>
 
-          <TextField
-            label="Remark"
-            value={remark}
-            onChange={(e) => setRemark(e.target.value)}
-            multiline
-            minRows={2}
-          />
+            <Grid size={{ xs: 6, sm: 3, md: 2 }}>
+              {/* Amount: auto-fills from HRS × rate, but stays freely editable */}
+              <TextField
+                fullWidth
+                label="Amount"
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                helperText={`Auto: HRS × ₹${RATE_PER_HOUR}`}
+              />
+            </Grid>
 
-          <Box>
-            <Button variant="contained" onClick={handleSave}>
+            <Grid size={{ xs: 12 }}>
+              <TextField
+                fullWidth
+                label="Remark"
+                value={remark}
+                onChange={(e) => setRemark(e.target.value)}
+                multiline
+                minRows={2}
+              />
+            </Grid>
+          </Grid>
+
+          <Divider sx={{ my: 3, borderColor: tokens.line }} />
+
+          <Stack direction="row" justifyContent="flex-end">
+            <Button variant="contained" size="large" onClick={handleSave}>
               Save
             </Button>
-          </Box>
-        </Box>
-      </Box>
+          </Stack>
+        </Card>
+      </Stack>
 
       <Snackbar
         open={snackbar.open}
@@ -312,11 +382,16 @@ function EquipmentMaintenance() {
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </>
+    </Box>
   );
 }
 

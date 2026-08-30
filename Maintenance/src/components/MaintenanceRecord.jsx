@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import {
   Box,
+  Card,
   Typography,
   Table,
   TableBody,
@@ -9,22 +10,43 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   TextField,
   Button,
   IconButton,
   MenuItem,
+  Stack,
 } from '@mui/material';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import { tokens, selectSx } from './theme';
+
+// Columns match exactly what EquipmentMaintenance.jsx sends to
+// POST /maintenance-records.
+const FIELDS = [
+  { label: 'Date', key: 'date' },
+  { label: 'Department', key: 'department' },
+  { label: 'Equipment', key: 'equipment' },
+  { label: 'Machine Number', key: 'machine_number' },
+  { label: 'Category', key: 'category' },
+  { label: 'Type of Work', key: 'type_of_work' },
+  { label: 'Work Details', key: 'work_details' },
+  { label: 'HRS', key: 'hrs' },
+  { label: 'Amount', key: 'amount' },
+  { label: 'Remark', key: 'remark' },
+];
+
+const TYPE_OF_WORK_OPTIONS = ['PM', 'CM', 'SERVICE', 'Installation'];
 
 function MaintenanceRecord() {
   const [records, setRecords] = useState([]);
-  const [filteredRecords, setFilteredRecords] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [typeOfWorkFilter, setTypeOfWorkFilter] = useState('');
+  const [machineryFilter, setMachineryFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const recordsPerPage = 10;
 
@@ -40,63 +62,42 @@ function MaintenanceRecord() {
       });
   }, []);
 
-  const getVisibleFields = (type) => {
-    const common = [
-      { label: 'Date', key: 'date' },
-      { label: 'Section', key: 'section' },
-      { label: 'Equipment', key: 'equipment' },
-      { label: 'Type', key: 'type' },
-      { label: 'Remark', key: 'remark' },
-      { label: 'Technician', key: 'technician_name' },
-    ];
+  // Machinery options for the filter dropdown, derived from whatever
+  // equipment names actually appear in the fetched records.
+  const machineryOptions = useMemo(() => {
+    const names = records.map((r) => r.equipment).filter(Boolean);
+    return Array.from(new Set(names)).sort();
+  }, [records]);
 
-    const cmFields = [
-      { label: 'Issue Description', key: 'issue_description' },
-      { label: 'Action Taken', key: 'action_taken' },
-    ];
+  const filteredRecords = useMemo(() => {
+    const q = searchQuery.toLowerCase();
 
-    const pmFields = [
-      { label: 'Frequency', key: 'frequency' },
-      { label: 'Task Description', key: 'task_description' },
-      { label: 'Details', key: 'details' },
-    ];
+    return records.filter((record) => {
+      if (q && !FIELDS.some(({ key }) => String(record[key] ?? '').toLowerCase().includes(q))) {
+        return false;
+      }
 
-    if (type === 'CM') return [...common, ...cmFields];
-    if (type === 'PM') return [...common, ...pmFields];
-    return [];
-  };
+      if (fromDate && record.date && record.date < fromDate) return false;
+      if (toDate && record.date && record.date > toDate) return false;
 
-  const visibleFields = getVisibleFields(typeFilter);
+      if (typeOfWorkFilter && record.type_of_work !== typeOfWorkFilter) return false;
 
-  const filterRecords = (type, query) => {
-    const q = query.toLowerCase();
-    const filtered = records.filter((record) => {
-      const matchesType = record.type === type;
-      const matchesQuery = Object.keys(record).some((key) =>
-        String(record[key]).toLowerCase().includes(q)
-      );
-      return matchesType && matchesQuery;
+      if (machineryFilter && record.equipment !== machineryFilter) return false;
+
+      return true;
     });
-    setFilteredRecords(filtered);
+  }, [records, searchQuery, fromDate, toDate, typeOfWorkFilter, machineryFilter]);
+
+  // Reset to page 1 whenever any filter narrows/changes the result set
+  useEffect(() => {
     setCurrentPage(1);
-  };
-
-  const handleTypeChange = (value) => {
-    setTypeFilter(value);
-    filterRecords(value, searchQuery); 
-  };
-
-  const handleSearch = () => {
-    if (typeFilter) {
-      filterRecords(typeFilter, searchQuery); 
-    }
-  };
+  }, [searchQuery, fromDate, toDate, typeOfWorkFilter, machineryFilter]);
 
   const handleDownload = () => {
     const excelData = filteredRecords.map((record) => {
       const row = {};
-      visibleFields.forEach(({ key }) => {
-        row[key] = record[key] || '';
+      FIELDS.forEach(({ key, label }) => {
+        row[label] = record[key] ?? '';
       });
       return row;
     });
@@ -109,139 +110,163 @@ function MaintenanceRecord() {
     saveAs(data, 'maintenance_records.xlsx');
   };
 
+  const clearFilters = () => {
+    setSearchQuery('');
+    setFromDate('');
+    setToDate('');
+    setTypeOfWorkFilter('');
+    setMachineryFilter('');
+  };
+
   const indexOfLastRecord = currentPage * recordsPerPage;
   const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
   const currentRecords = filteredRecords.slice(indexOfFirstRecord, indexOfLastRecord);
-  const totalPages = Math.ceil(filteredRecords.length / recordsPerPage);
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / recordsPerPage));
 
   return (
-    <>
-      <Typography
-        variant="h5"
-        align="center"
-        gutterBottom
-        color="#872341"
-        fontFamily="Open Sans, sans-serif"
-      >
+    <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
+      <Typography variant="h5" gutterBottom sx={{ color: tokens.maroon, mb: 3 }}>
         Maintenance Records
       </Typography>
 
-      {/* Filter + Search */}
-      <Box
+      {/* Filters */}
+      <Card
         sx={{
-          maxWidth: 1500,
-          mx: 'auto',
-          mt: 3,
-          mb: 1,
-          display: 'flex',
-          justifyContent: 'center',
-          gap: 2,
-          flexWrap: 'wrap',
+          p: 2.5,
+          mb: 3,
+          borderRadius: '16px',
+          border: `1px solid ${tokens.line}`,
+          boxShadow: '0 1px 2px rgba(38,33,27,0.04)',
         }}
       >
-        <TextField
-          select
-          label="Type"
-          value={typeFilter}
-          onChange={(e) => handleTypeChange(e.target.value)}
-          sx={{ width: 150 }}
-        >
-          <MenuItem value="">Select</MenuItem>
-          <MenuItem value="PM">PM</MenuItem>
-          <MenuItem value="CM">CM</MenuItem>
-        </TextField>
+        <Stack direction="row" gap={2} flexWrap="wrap" alignItems="center">
+          <TextField
+            label="From Date"
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            sx={{ width: 170 }}
+          />
 
-        <TextField
-          placeholder="Search records..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          variant="outlined"
-          sx={{ width: '30%' }}
-        />
+          <TextField
+            label="To Date"
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            sx={{ width: 170 }}
+          />
 
-        <Button
-          variant="contained"
-          onClick={handleSearch}
-          disabled={!typeFilter}
-          sx={{ backgroundColor: '#872341' }}
-        >
-          Search
-        </Button>
-      </Box>
-
-      {/* Show table only when type is selected */}
-      {typeFilter && (
-        <>
-          <Box
-            sx={{
-              maxWidth: 1600,
-              mx: 'auto',
-              mt: 3,
-              p: 2,
-              bgcolor: '#FEFBF6',
-              borderRadius: 3,
-              boxShadow: 4,
-            }}
+          <TextField
+            select
+            label="Type of Work"
+            value={typeOfWorkFilter}
+            onChange={(e) => setTypeOfWorkFilter(e.target.value)}
+            sx={{ width: 170, ...selectSx }}
           >
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead sx={{ bgcolor: '#872341' }}>
-                  <TableRow>
-                    {visibleFields.map((field) => (
-                      <TableCell key={field.key} sx={{ color: 'white' }}>
-                        {field.label}
+            <MenuItem value="">All</MenuItem>
+            {TYPE_OF_WORK_OPTIONS.map((opt) => (
+              <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            select
+            label="Machinery"
+            value={machineryFilter}
+            onChange={(e) => setMachineryFilter(e.target.value)}
+            sx={{ width: 200, ...selectSx }}
+          >
+            <MenuItem value="">All</MenuItem>
+            {machineryOptions.map((name) => (
+              <MenuItem key={name} value={name}>{name}</MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            placeholder="Search records..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            variant="outlined"
+            sx={{ width: 260 }}
+          />
+
+          <Button variant="outlined" onClick={clearFilters} sx={{ borderColor: tokens.line, color: tokens.muted }}>
+            Clear
+          </Button>
+
+          <Button
+            variant="contained"
+            onClick={handleDownload}
+            startIcon={<FileDownloadIcon />}
+            sx={{ ml: 'auto' }}
+          >
+            Download
+          </Button>
+        </Stack>
+      </Card>
+
+      <Card
+        sx={{
+          borderRadius: '16px',
+          border: `1px solid ${tokens.line}`,
+          boxShadow: '0 1px 2px rgba(38,33,27,0.04)',
+          overflow: 'hidden',
+        }}
+      >
+        <TableContainer>
+          <Table>
+            <TableHead sx={{ bgcolor: tokens.amberTint }}>
+              <TableRow>
+                {FIELDS.map((field) => (
+                  <TableCell key={field.key} sx={{ color: tokens.amberDark, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    {field.label}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {currentRecords.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={FIELDS.length} align="center" sx={{ color: tokens.muted, py: 4 }}>
+                    No maintenance records found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                currentRecords.map((record, index) => (
+                  <TableRow key={record.id ?? index} hover>
+                    {FIELDS.map((field) => (
+                      <TableCell key={field.key}>
+                        {field.key === 'amount' && record[field.key] !== undefined && record[field.key] !== null
+                          ? `₹${record[field.key]}`
+                          : record[field.key] ?? ''}
                       </TableCell>
                     ))}
                   </TableRow>
-                </TableHead>
-                <TableBody>
-                  {currentRecords.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={visibleFields.length} align="center">
-                        No maintenance records found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    currentRecords.map((record, index) => (
-                      <TableRow key={index}>
-                        {visibleFields.map((field) => (
-                          <TableCell key={field.key}>
-                            {record[field.key] || ''}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
 
-            {/* Pagination */}
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 2 }}>
-              <IconButton disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)}>
-                <ArrowBackIosNewIcon />
-              </IconButton>
-              <Typography sx={{ mx: 2 }}>
-                Page {currentPage} of {totalPages}
-              </Typography>
-              <IconButton
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage((p) => p + 1)}
-              >
-                <ArrowForwardIosIcon />
-              </IconButton>
-            </Box>
-          </Box>
-
-          {/* Download Button */}
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, mb: 5 }}>
-            <Button variant="contained" onClick={handleDownload} sx={{ backgroundColor: 'blue' }}>
-              Download
-            </Button>
-          </Box>
-        </>
-      )}
-    </>
+        {/* Pagination */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 2, borderTop: `1px solid ${tokens.line}` }}>
+          <IconButton disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)}>
+            <ArrowBackIosNewIcon fontSize="small" />
+          </IconButton>
+          <Typography sx={{ mx: 2, color: tokens.muted, fontSize: '0.9rem' }}>
+            Page {currentPage} of {totalPages}
+          </Typography>
+          <IconButton
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage((p) => p + 1)}
+          >
+            <ArrowForwardIosIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      </Card>
+    </Box>
   );
 }
 

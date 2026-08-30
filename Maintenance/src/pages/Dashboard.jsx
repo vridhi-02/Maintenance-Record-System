@@ -11,11 +11,13 @@ import {
   Alert,
   IconButton,
   Tooltip,
+  Stack,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import BuildIcon from '@mui/icons-material/Build';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import LogoutIcon from '@mui/icons-material/Logout';
+import { tokens, fonts } from '../components/theme';
 import '../App.css';
 
 function Dashboard() {
@@ -37,90 +39,155 @@ function Dashboard() {
   };
 
   const sidebarItems = [
-    { key: 'equipment', label: 'Equipment Maintenance(PM & CM)', icon: <BuildIcon fontSize="small" /> },
-    { key: 'record', label: 'Maintenance Record', icon: <AssignmentIcon fontSize="small" /> },
+    {
+      key: 'equipment',
+      label: 'Equipment Maintenance (PM & CM)',
+      subtitle: 'Log preventive and corrective maintenance work',
+      icon: <BuildIcon fontSize="small" />,
+    },
+    {
+      key: 'record',
+      label: 'Maintenance Record',
+      subtitle: 'Review past maintenance entries',
+      icon: <AssignmentIcon fontSize="small" />,
+    },
   ];
 
+  const activeItem = sidebarItems.find((i) => i.key === activeSection);
+  const sidebarWidth = sidebarOpen ? 264 : 76;
+
   return (
-    <Box className="dashboard-wrapper">
-      {/* Sidebar */}
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: tokens.paper }}>
+      {/* Sidebar — light surface, amber accent on the active item */}
       <Box
-        className="sidebar"
         sx={{
-          width: sidebarOpen ? '240px' : '70px',
-          transition: 'width 0.3s ease',
-          alignItems: sidebarOpen ? 'flex-start' : 'center',
+          width: sidebarWidth,
+          flexShrink: 0,
+          position: 'sticky',
+          top: 0,
+          height: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          bgcolor: tokens.card,
+          borderRight: `1px solid ${tokens.line}`,
+          transition: 'width 0.25s ease',
+          overflowX: 'hidden',
+          py: 2.5,
         }}
       >
-        {/* Top: Logo + Toggle */}
-        <Box sx={{ width: '100%' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: sidebarOpen ? 'space-between' : 'center' }}>
-            <img src="/logo.jpeg" alt="Logo" className="sidebar-logo" />
-            <IconButton onClick={() => setSidebarOpen(!sidebarOpen)}>
-              <MenuIcon sx={{ color: 'white' }} />
-            </IconButton>
+        <Box>
+          {/* Top: Logo + Toggle */}
+          <Box sx={{ px: sidebarOpen ? 2.5 : 0 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: sidebarOpen ? 'space-between' : 'center',
+              }}
+            >
+              {sidebarOpen && (
+                <Stack direction="row" spacing={1.25} alignItems="center">
+                  <Box component="img" src="/logo.jpeg" alt="Logo" className="sidebar-logo" />
+                  <Typography sx={{ fontFamily: fonts.display, fontWeight: 700, fontSize: '1rem', color: tokens.ink }}>
+                    Maintenance
+                  </Typography>
+                </Stack>
+              )}
+              <IconButton onClick={() => setSidebarOpen(!sidebarOpen)} size="small" sx={{ color: tokens.muted }}>
+                <MenuIcon fontSize="small" />
+              </IconButton>
+            </Box>
           </Box>
 
-          <Divider sx={{ backgroundColor: '#bdc3c7', my: 2 }} />
+          <Divider sx={{ borderColor: tokens.line, mx: sidebarOpen ? 2.5 : 1.5, my: 2 }} />
 
           {/* Menu */}
-          <Box className="sidebar-menu">
-            {sidebarItems.map((item) => (
-              <Tooltip
-                key={item.key}
-                title={sidebarOpen ? '' : item.label}
-                placement="right"
-              >
-                <Typography
-                  variant="h6"
+          <Stack spacing={0.5} sx={{ px: 1.25 }}>
+            {sidebarItems.map((item) => {
+              const active = activeSection === item.key;
+              const button = (
+                <Box
+                  key={item.key}
                   onClick={() => handleSectionClick(item.key)}
                   sx={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 1,
-                    mb: 1,
+                    gap: 1.5,
                     cursor: 'pointer',
-                    color: activeSection === item.key ? '#FAB12F' : '#fff',
-                    '&:hover': { color: '#FAB12F' },
+                    borderRadius: '10px',
+                    px: sidebarOpen ? 1.5 : 0,
+                    py: 1.1,
+                    justifyContent: sidebarOpen ? 'flex-start' : 'center',
+                    color: active ? tokens.amberDark : tokens.muted,
+                    bgcolor: active ? tokens.amberTint : 'transparent',
+                    fontWeight: active ? 600 : 500,
+                    transition: 'all 0.15s ease',
+                    '&:hover': { bgcolor: tokens.amberTint, color: tokens.amberDark },
                   }}
                 >
-                  {item.icon}
-                  {sidebarOpen && item.label}
-                </Typography>
-              </Tooltip>
-            ))}
-          </Box>
+                  <Box sx={{ display: 'flex' }}>{item.icon}</Box>
+                  {sidebarOpen && <Typography sx={{ fontSize: '0.88rem' }}>{item.label}</Typography>}
+                </Box>
+              );
+              return sidebarOpen ? (
+                button
+              ) : (
+                <Tooltip key={item.key} title={item.label} placement="right">
+                  {button}
+                </Tooltip>
+              );
+            })}
+          </Stack>
         </Box>
 
         {/* Logout */}
-        <Button
-          onClick={handleLogout}
-          variant="contained"
-          size="small"
-          fullWidth={sidebarOpen}
-          startIcon={<LogoutIcon />}
-          sx={{
-            backgroundColor: '#e74c3c',
-            color: 'white',
-            borderRadius: '8px',
-            textTransform: 'none',
-            fontSize: '14px',
-            fontWeight: 500,
-            
-            justifyContent: sidebarOpen ? 'flex-start' : 'center',
-            px: sidebarOpen ? 2 : 0,
-            '&:hover': { backgroundColor: '#c0392b' },
-            mt: 2,
-          }}
-        >
-          {sidebarOpen && 'Logout'}
-        </Button>
+        <Box sx={{ px: sidebarOpen ? 2 : 1.5 }}>
+          <Divider sx={{ borderColor: tokens.line, mb: 1.5 }} />
+          <Button
+            onClick={handleLogout}
+            fullWidth
+            variant="outlined"
+            startIcon={sidebarOpen ? <LogoutIcon fontSize="small" /> : null}
+            sx={{
+              minWidth: 0,
+              color: tokens.danger,
+              borderColor: tokens.line,
+              justifyContent: sidebarOpen ? 'flex-start' : 'center',
+              px: sidebarOpen ? 1.5 : 0,
+              '&:hover': { bgcolor: tokens.dangerTint, borderColor: tokens.danger },
+            }}
+          >
+            {sidebarOpen ? 'Log out' : <LogoutIcon fontSize="small" />}
+          </Button>
+        </Box>
       </Box>
 
       {/* Main Content */}
-      <Box className="dashboard-content">
-        {activeSection === 'equipment' && <EquipmentMaintenance />}
-        {activeSection === 'record' && <MaintenanceRecord />}
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Box
+          sx={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 5,
+            bgcolor: tokens.paper,
+            borderBottom: `1px solid ${tokens.line}`,
+            px: { xs: 3, md: 5 },
+            py: 2.25,
+          }}
+        >
+          <Typography variant="h5" sx={{ color: tokens.ink }}>
+            {activeItem?.label}
+          </Typography>
+          <Typography variant="body2" sx={{ color: tokens.muted, mt: 0.25 }}>
+            {activeItem?.subtitle}
+          </Typography>
+        </Box>
+
+        <Box sx={{ px: { xs: 3, md: 5 }, py: 4 }}>
+          {activeSection === 'equipment' && <EquipmentMaintenance />}
+          {activeSection === 'record' && <MaintenanceRecord />}
+        </Box>
       </Box>
 
       {/* Snackbar */}
