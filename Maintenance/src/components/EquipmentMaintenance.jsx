@@ -31,7 +31,7 @@ import {
 } from '@mui/material';
 import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
 import AssignmentIcon from '@mui/icons-material/Assignment';
-import HistoryIcon from '@mui/icons-material/History';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { tokens } from './theme';
@@ -49,12 +49,12 @@ const getTodayDate = () => new Date().toISOString().split('T')[0];
 // visually separates "what machine" from "what was done to it".
 function SectionHeader({ icon, title }) {
   return (
-    <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 2.5 }}>
+    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
       <Box
         sx={{
-          width: 32,
-          height: 32,
-          borderRadius: '9px',
+          width: 28,
+          height: 28,
+          borderRadius: '8px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -172,7 +172,7 @@ function RecordForm({ initialValues, departments, categories, onSubmit, submitLa
 
   return (
     <>
-      <Grid container spacing={2.5}>
+      <Grid container spacing={2}>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <TextField
             fullWidth
@@ -275,11 +275,11 @@ function RecordForm({ initialValues, departments, categories, onSubmit, submitLa
         </Grid>
       </Grid>
 
-      <Divider sx={{ my: 3, borderColor: tokens.line }} />
+      <Divider sx={{ my: 2, borderColor: tokens.line }} />
 
       <SectionHeader icon={<AssignmentIcon fontSize="small" />} title="Work Details" />
 
-      <Grid container spacing={2.5}>
+      <Grid container spacing={2}>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <FormControl fullWidth required>
             <InputLabel id="type-of-work-label">Type of Work</InputLabel>
@@ -352,10 +352,10 @@ function RecordForm({ initialValues, departments, categories, onSubmit, submitLa
       </Grid>
 
       {formError && (
-        <Typography sx={{ color: tokens.danger, fontSize: '0.85rem', mt: 2 }}>{formError}</Typography>
+        <Typography sx={{ color: tokens.danger, fontSize: '0.85rem', mt: 1.5 }}>{formError}</Typography>
       )}
 
-      <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ mt: 3 }}>
+      <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ mt: 2 }}>
         {onCancel && (
           <Button variant="outlined" onClick={onCancel} sx={{ borderColor: tokens.line, color: tokens.muted }}>
             Cancel
@@ -369,7 +369,7 @@ function RecordForm({ initialValues, departments, categories, onSubmit, submitLa
   );
 }
 
-const RECENT_TABLE_FIELDS = [
+const SAVED_TABLE_FIELDS = [
   { label: 'Date', key: 'date' },
   { label: 'Department', key: 'department' },
   { label: 'Equipment', key: 'equipment' },
@@ -383,10 +383,13 @@ const RECENT_TABLE_FIELDS = [
 function EquipmentMaintenance() {
   const [departments, setDepartments] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [recentRecords, setRecentRecords] = useState([]);
+  // Only the single record that was just saved/edited in this session —
+  // not a history pulled from the server. Nothing renders below the
+  // form until this is set, so there's nothing extra to scroll past.
+  const [savedRecord, setSavedRecord] = useState(null);
   const [formResetKey, setFormResetKey] = useState(0);
-  const [editingRecord, setEditingRecord] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
@@ -401,26 +404,13 @@ function EquipmentMaintenance() {
       .catch((err) => console.error('Error fetching categories:', err));
   }, []);
 
-  const fetchRecent = () => {
-    axios.get(`${API_BASE}/maintenance-records`)
-      .then((res) => {
-        const sorted = [...res.data].sort((a, b) => b.id - a.id);
-        setRecentRecords(sorted.slice(0, 5));
-      })
-      .catch((err) => console.error('Error fetching recent records:', err));
-  };
-
-  useEffect(() => {
-    fetchRecent();
-  }, []);
-
   const handleCreate = async (payload) => {
     try {
       const res = await axios.post(`${API_BASE}/maintenance-records`, payload);
       if (res.status === 201) {
         setSnackbar({ open: true, message: 'Maintenance record saved successfully!', severity: 'success' });
+        setSavedRecord({ ...payload, id: res.data.id });
         setFormResetKey((k) => k + 1); // remounts the form with fresh defaults
-        fetchRecent();
       }
     } catch (err) {
       console.error(err?.response?.data || err.message);
@@ -430,10 +420,10 @@ function EquipmentMaintenance() {
 
   const handleUpdate = async (payload) => {
     try {
-      await axios.put(`${API_BASE}/maintenance-records/${editingRecord.id}`, payload);
+      await axios.put(`${API_BASE}/maintenance-records/${savedRecord.id}`, payload);
       setSnackbar({ open: true, message: 'Record updated successfully!', severity: 'success' });
-      setEditingRecord(null);
-      fetchRecent();
+      setSavedRecord({ ...payload, id: savedRecord.id });
+      setIsEditing(false);
     } catch (err) {
       console.error(err?.response?.data || err.message);
       setSnackbar({ open: true, message: 'Failed to update record.', severity: 'error' });
@@ -441,25 +431,25 @@ function EquipmentMaintenance() {
   };
 
   const handleDelete = async () => {
-    if (!deleteTarget) return;
+    if (!savedRecord) return;
     try {
-      await axios.delete(`${API_BASE}/maintenance-records/${deleteTarget.id}`);
+      await axios.delete(`${API_BASE}/maintenance-records/${savedRecord.id}`);
       setSnackbar({ open: true, message: 'Record deleted.', severity: 'success' });
-      fetchRecent();
+      setSavedRecord(null);
     } catch (err) {
       console.error(err?.response?.data || err.message);
       setSnackbar({ open: true, message: 'Failed to delete record.', severity: 'error' });
     } finally {
-      setDeleteTarget(null);
+      setConfirmingDelete(false);
     }
   };
 
   return (
     <Box sx={{ maxWidth: 1080, mx: 'auto' }}>
-      <Stack spacing={3}>
+      <Stack spacing={2}>
         <Card
           sx={{
-            p: { xs: 2.5, md: 3.5 },
+            p: { xs: 2, md: 2.5 },
             borderRadius: '16px',
             border: `1px solid ${tokens.line}`,
             boxShadow: '0 1px 2px rgba(38,33,27,0.04)',
@@ -475,108 +465,100 @@ function EquipmentMaintenance() {
           />
         </Card>
 
-        {/* Recently added records — editable inline via Edit/Delete */}
-        <Card
-          sx={{
-            borderRadius: '16px',
-            border: `1px solid ${tokens.line}`,
-            boxShadow: '0 1px 2px rgba(38,33,27,0.04)',
-            overflow: 'hidden',
-          }}
-        >
-          <Stack direction="row" spacing={1.25} alignItems="center" sx={{ p: { xs: 2.5, md: 3.5 }, pb: 2 }}>
-            <Box
-              sx={{
-                width: 32, height: 32, borderRadius: '9px', display: 'flex',
-                alignItems: 'center', justifyContent: 'center',
-                bgcolor: tokens.amberTint, color: tokens.amberDark,
-              }}
-            >
-              <HistoryIcon fontSize="small" />
-            </Box>
-            <Typography variant="subtitle1" sx={{ color: tokens.ink }}>
-              Recently Added Records
-            </Typography>
-          </Stack>
+        {/* Only appears once a record has actually been saved this session. */}
+        {savedRecord && (
+          <Card
+            sx={{
+              borderRadius: '16px',
+              border: `1px solid ${tokens.line}`,
+              boxShadow: '0 1px 2px rgba(38,33,27,0.04)',
+              overflow: 'hidden',
+            }}
+          >
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ p: 2, pb: 1 }}>
+              <Box
+                sx={{
+                  width: 28, height: 28, borderRadius: '8px', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center',
+                  bgcolor: tokens.successTint, color: tokens.success,
+                }}
+              >
+                <CheckCircleIcon fontSize="small" />
+              </Box>
+              <Typography variant="subtitle1" sx={{ color: tokens.ink }}>
+                Saved
+              </Typography>
+            </Stack>
 
-          <TableContainer>
-            <Table>
-              <TableHead sx={{ bgcolor: tokens.amberTint }}>
-                <TableRow>
-                  {RECENT_TABLE_FIELDS.map((f) => (
-                    <TableCell key={f.key} sx={{ color: tokens.amberDark, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                      {f.label}
-                    </TableCell>
-                  ))}
-                  <TableCell sx={{ color: tokens.amberDark, fontWeight: 700 }} align="right">
-                    Actions
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {recentRecords.length === 0 ? (
+            <TableContainer>
+              <Table size="small">
+                <TableHead sx={{ bgcolor: tokens.amberTint }}>
                   <TableRow>
-                    <TableCell colSpan={RECENT_TABLE_FIELDS.length + 1} align="center" sx={{ color: tokens.muted, py: 4 }}>
-                      No records yet — save one above and it'll show up here.
+                    {SAVED_TABLE_FIELDS.map((f) => (
+                      <TableCell key={f.key} sx={{ color: tokens.amberDark, fontWeight: 700, whiteSpace: 'nowrap', py: 1 }}>
+                        {f.label}
+                      </TableCell>
+                    ))}
+                    <TableCell sx={{ color: tokens.amberDark, fontWeight: 700, py: 1 }} align="right">
+                      Actions
                     </TableCell>
                   </TableRow>
-                ) : (
-                  recentRecords.map((record) => (
-                    <TableRow key={record.id} hover>
-                      {RECENT_TABLE_FIELDS.map((f) => (
-                        <TableCell key={f.key}>
-                          {f.key === 'amount' ? `₹${record[f.key]}` : record[f.key]}
-                        </TableCell>
-                      ))}
-                      <TableCell align="right">
-                        <IconButton size="small" onClick={() => setEditingRecord(record)} sx={{ color: tokens.steel }}>
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" onClick={() => setDeleteTarget(record)} sx={{ color: tokens.danger }}>
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
+                </TableHead>
+                <TableBody>
+                  <TableRow hover>
+                    {SAVED_TABLE_FIELDS.map((f) => (
+                      <TableCell key={f.key} sx={{ py: 1 }}>
+                        {f.key === 'amount' ? `₹${savedRecord[f.key]}` : savedRecord[f.key]}
                       </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Card>
+                    ))}
+                    <TableCell align="right" sx={{ py: 0.5 }}>
+                      <IconButton size="small" onClick={() => setIsEditing(true)} sx={{ color: tokens.steel }}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" onClick={() => setConfirmingDelete(true)} sx={{ color: tokens.danger }}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Card>
+        )}
       </Stack>
 
       {/* Edit dialog — reuses the exact same form as the add form above */}
-      <Dialog open={!!editingRecord} onClose={() => setEditingRecord(null)} maxWidth="md" fullWidth>
+      <Dialog open={isEditing} onClose={() => setIsEditing(false)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>
           Edit Maintenance Record
         </DialogTitle>
         <DialogContent dividers sx={{ borderColor: tokens.line }}>
-          {editingRecord && (
+          {savedRecord && (
             <RecordForm
-              initialValues={editingRecord}
+              initialValues={savedRecord}
               departments={departments}
               categories={categories}
               onSubmit={handleUpdate}
               submitLabel="Update Record"
-              onCancel={() => setEditingRecord(null)}
+              onCancel={() => setIsEditing(false)}
             />
           )}
         </DialogContent>
       </Dialog>
 
       {/* Delete confirmation */}
-      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
+      <Dialog open={confirmingDelete} onClose={() => setConfirmingDelete(false)}>
         <DialogTitle sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>
           Delete this record?
         </DialogTitle>
         <DialogContent>
           <Typography sx={{ color: tokens.muted }}>
-            This will permanently delete the {deleteTarget?.equipment} maintenance entry from{' '}
-            {deleteTarget?.date}. This can't be undone.
+            This will permanently delete the {savedRecord?.equipment} maintenance entry from{' '}
+            {savedRecord?.date}. This can't be undone.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setDeleteTarget(null)} sx={{ color: tokens.muted }}>
+          <Button onClick={() => setConfirmingDelete(false)} sx={{ color: tokens.muted }}>
             Cancel
           </Button>
           <Button variant="contained" onClick={handleDelete} sx={{ bgcolor: tokens.danger, '&:hover': { bgcolor: '#A63930' } }}>
