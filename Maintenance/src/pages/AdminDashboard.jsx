@@ -46,8 +46,7 @@ function AdminDashboard() {
   const sidebarItems = [
     {
       key: 'equipment',
-      label: 'Equipment Maintenance (PM & CM)',
-      subtitle: 'Log preventive and corrective maintenance work',
+      label: 'Equipment Maintenance',
       icon: <ConstructionIcon fontSize="small" />,
     },
     {

@@ -279,7 +279,7 @@ function RecordForm({ initialValues, departments, categories, onSubmit, submitLa
 
       <SectionHeader icon={<AssignmentIcon fontSize="small" />} title="Work Details" />
 
-      <Grid container spacing={2}>
+      <Grid container spacing={2} alignItems="flex-end">
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <FormControl fullWidth required>
             <InputLabel id="type-of-work-label">Type of Work</InputLabel>
@@ -339,32 +339,36 @@ function RecordForm({ initialValues, departments, categories, onSubmit, submitLa
           </Tooltip>
         </Grid>
 
-        <Grid size={{ xs: 6 }}>
+        {/* Remark and the submit action now share one row: Remark takes
+            the bulk of the width, and Save/Cancel sit right beside it —
+            instead of a separate full-width Stack underneath, which was
+            leaving a tall empty gap below the form. */}
+        <Grid size={{ xs: 12, sm: 8, md: 9 }}>
           <TextField
             fullWidth
             label="Remark"
             value={remark}
             onChange={(e) => setRemark(e.target.value)}
-            multiline
-            minRows={1}
           />
+        </Grid>
+
+        <Grid size={{ xs: 12, sm: 4, md: 3 }}>
+          <Stack direction="row" spacing={1.5} justifyContent="flex-end">
+            {onCancel && (
+              <Button variant="outlined" onClick={onCancel} sx={{ borderColor: tokens.line, color: tokens.muted }}>
+                Cancel
+              </Button>
+            )}
+            <Button variant="contained" size="large" onClick={handleSubmit} fullWidth={!onCancel}>
+              {submitLabel}
+            </Button>
+          </Stack>
         </Grid>
       </Grid>
 
       {formError && (
-        <Typography sx={{ color: tokens.danger, fontSize: '0.85rem', mt: 1.5 }}>{formError}</Typography>
+        <Typography sx={{ color: tokens.danger, fontSize: '0.85rem', mt: 1 }}>{formError}</Typography>
       )}
-
-      <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ mt: 2 }}>
-        {onCancel && (
-          <Button variant="outlined" onClick={onCancel} sx={{ borderColor: tokens.line, color: tokens.muted }}>
-            Cancel
-          </Button>
-        )}
-        <Button variant="contained" size="large" onClick={handleSubmit}>
-          {submitLabel}
-        </Button>
-      </Stack>
     </>
   );
 }
@@ -378,6 +382,7 @@ const SAVED_TABLE_FIELDS = [
   { label: 'Type', key: 'type_of_work' },
   { label: 'HRS', key: 'hrs' },
   { label: 'Amount', key: 'amount' },
+  { label: 'Remark', key: 'remark' },
 ];
 
 function EquipmentMaintenance() {
@@ -499,7 +504,7 @@ function EquipmentMaintenance() {
                         {f.label}
                       </TableCell>
                     ))}
-                    <TableCell sx={{ color: tokens.amberDark, fontWeight: 700, py: 1 }} align="right">
+                    <TableCell sx={{ color: tokens.amberDark, fontWeight: 700, py: 1, whiteSpace: 'nowrap' }} align="right">
                       Actions
                     </TableCell>
                   </TableRow>
@@ -507,17 +512,26 @@ function EquipmentMaintenance() {
                 <TableBody>
                   <TableRow hover>
                     {SAVED_TABLE_FIELDS.map((f) => (
-                      <TableCell key={f.key} sx={{ py: 1 }}>
+                      <TableCell
+                        key={f.key}
+                        sx={{
+                          py: 1,
+                          whiteSpace: f.key === 'date' ? 'nowrap' : 'normal',
+                          verticalAlign: 'middle',
+                        }}
+                      >
                         {f.key === 'amount' ? `₹${savedRecord[f.key]}` : savedRecord[f.key]}
                       </TableCell>
                     ))}
-                    <TableCell align="right" sx={{ py: 0.5 }}>
-                      <IconButton size="small" onClick={() => setIsEditing(true)} sx={{ color: tokens.steel }}>
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton size="small" onClick={() => setConfirmingDelete(true)} sx={{ color: tokens.danger }}>
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
+                    <TableCell align="right" sx={{ py: 0.5, whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                      <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
+                        <IconButton size="small" onClick={() => setIsEditing(true)} sx={{ color: tokens.steel }}>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" onClick={() => setConfirmingDelete(true)} sx={{ color: tokens.danger }}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 </TableBody>
