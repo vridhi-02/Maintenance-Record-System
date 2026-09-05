@@ -54,7 +54,7 @@ function SectionHeader({ icon, title }) {
         sx={{
           width: 28,
           height: 28,
-          borderRadius: '8px',
+          borderRadius: '50px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -172,8 +172,8 @@ function RecordForm({ initialValues, departments, categories, onSubmit, submitLa
 
   return (
     <>
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+      <Grid container spacing={1}>
+        <Grid size={{ xs: 6, sm: 6, md: 3 }}>
           <TextField
             fullWidth
             label="Date"
@@ -211,15 +211,15 @@ function RecordForm({ initialValues, departments, categories, onSubmit, submitLa
 
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <FormControl fullWidth required disabled={!selectedDepartment}>
-            <InputLabel id="machinery-label">Machinery</InputLabel>
+            <InputLabel id="machinery-label">Machine Name</InputLabel>
             <Select
               labelId="machinery-label"
               value={selectedMachinery}
-              label="Machinery"
+              label="Machine Name"
               onChange={(e) => setSelectedMachinery(e.target.value)}
             >
               <MenuItem value="">
-                <em>Select Machinery</em>
+                <em>Select Machine Name</em>
               </MenuItem>
               {machineryList.map((machinery) => (
                 <MenuItem key={machinery.id} value={machinery.machinery_name}>
@@ -339,14 +339,14 @@ function RecordForm({ initialValues, departments, categories, onSubmit, submitLa
           </Tooltip>
         </Grid>
 
-        <Grid size={{ xs: 12 }}>
+        <Grid size={{ xs: 6 }}>
           <TextField
             fullWidth
             label="Remark"
             value={remark}
             onChange={(e) => setRemark(e.target.value)}
             multiline
-            minRows={2}
+            minRows={1}
           />
         </Grid>
       </Grid>
@@ -455,7 +455,7 @@ function EquipmentMaintenance() {
             boxShadow: '0 1px 2px rgba(38,33,27,0.04)',
           }}
         >
-          <SectionHeader icon={<PrecisionManufacturingIcon fontSize="small" />} title="Equipment & Location" />
+          <SectionHeader icon={<PrecisionManufacturingIcon fontSize="small" />} title="Equipment Details" />
           <RecordForm
             key={formResetKey}
             departments={departments}

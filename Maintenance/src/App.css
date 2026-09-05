@@ -37,8 +37,8 @@ html, body, #root {
 
 /* Logo styling */
 .sidebar-logo {
-  width: 40px;
-  height: 40px;
+  width: 100px;
+  height: 100px;
   object-fit: cover;
   border-radius: 8px;
   margin-bottom: 0;
@@ -57,5 +57,5 @@ html, body, #root {
   flex: 1;
   padding: 16px;
   overflow-y: auto;
-  height: 100vh;
+  height: 500px;
 }
