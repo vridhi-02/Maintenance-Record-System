@@ -543,8 +543,14 @@ function EquipmentMaintenance() {
       const res = await axios.get(`${API_BASE}/maintenance-records`, {
         params: { date: searchDate },
       });
-      setSearchResults(res.data);
-      if (!res.data || res.data.length === 0) {
+      // The backend endpoint doesn't reliably filter by date (it may
+      // ignore the query param and return every record), so filter
+      // down to the selected date on the client as well. This is a
+      // no-op if the server already filtered correctly.
+      const allRecords = Array.isArray(res.data) ? res.data : [];
+      const filtered = allRecords.filter((r) => r.date === searchDate);
+      setSearchResults(filtered);
+      if (filtered.length === 0) {
         setSnackbar({ open: true, message: 'No records found for that date.', severity: 'info' });
       }
     } catch (err) {
