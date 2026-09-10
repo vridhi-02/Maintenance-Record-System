@@ -28,12 +28,15 @@ import {
   DialogContent,
   DialogActions,
   Tooltip,
+  CircularProgress,
 } from '@mui/material';
 import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import SearchIcon from '@mui/icons-material/Search';
+import HistoryIcon from '@mui/icons-material/History';
 import { tokens } from './theme';
 
 const API_BASE = 'http://localhost:8081';
@@ -385,6 +388,58 @@ const SAVED_TABLE_FIELDS = [
   { label: 'Remark', key: 'remark' },
 ];
 
+// Reusable read-only results table with per-row Edit/Delete actions.
+// Used for both the "just saved this session" row and the "records
+// found for a previous date" rows, so both flows share one look.
+function RecordsTable({ records, onEdit, onDelete }) {
+  return (
+    <TableContainer>
+      <Table size="small">
+        <TableHead sx={{ bgcolor: tokens.amberTint }}>
+          <TableRow>
+            {SAVED_TABLE_FIELDS.map((f) => (
+              <TableCell key={f.key} sx={{ color: tokens.amberDark, fontWeight: 700, whiteSpace: 'nowrap', py: 1 }}>
+                {f.label}
+              </TableCell>
+            ))}
+            <TableCell sx={{ color: tokens.amberDark, fontWeight: 700, py: 1, whiteSpace: 'nowrap' }} align="right">
+              Actions
+            </TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {records.map((record) => (
+            <TableRow hover key={record.id}>
+              {SAVED_TABLE_FIELDS.map((f) => (
+                <TableCell
+                  key={f.key}
+                  sx={{
+                    py: 1,
+                    whiteSpace: f.key === 'date' ? 'nowrap' : 'normal',
+                    verticalAlign: 'middle',
+                  }}
+                >
+                  {f.key === 'amount' ? `₹${record[f.key]}` : record[f.key]}
+                </TableCell>
+              ))}
+              <TableCell align="right" sx={{ py: 0.5, whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
+                  <IconButton size="small" onClick={() => onEdit(record)} sx={{ color: tokens.steel }}>
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton size="small" onClick={() => onDelete(record)} sx={{ color: tokens.danger }}>
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+
 function EquipmentMaintenance() {
   const [departments, setDepartments] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -393,8 +448,21 @@ function EquipmentMaintenance() {
   // form until this is set, so there's nothing extra to scroll past.
   const [savedRecord, setSavedRecord] = useState(null);
   const [formResetKey, setFormResetKey] = useState(0);
+
+  // The record currently targeted by the Edit dialog or the Delete
+  // confirmation — can come from `savedRecord` above OR from a row in
+  // the "previous date" search results below, so editing isn't limited
+  // to only the record you just saved this session.
+  const [activeRecord, setActiveRecord] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  // "Find & Edit Previous Records" — pick a date, pull whatever was
+  // saved that day, and edit/delete straight from that list.
+  const [searchDate, setSearchDate] = useState(getTodayDate());
+  const [searchResults, setSearchResults] = useState(null); // null = no search run yet
+  const [searchLoading, setSearchLoading] = useState(false);
+
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
@@ -424,11 +492,23 @@ function EquipmentMaintenance() {
   };
 
   const handleUpdate = async (payload) => {
+    if (!activeRecord) return;
     try {
-      await axios.put(`${API_BASE}/maintenance-records/${savedRecord.id}`, payload);
+      await axios.put(`${API_BASE}/maintenance-records/${activeRecord.id}`, payload);
       setSnackbar({ open: true, message: 'Record updated successfully!', severity: 'success' });
-      setSavedRecord({ ...payload, id: savedRecord.id });
+
+      const updated = { ...payload, id: activeRecord.id };
+
+      // Reflect the change wherever this record is currently displayed.
+      if (savedRecord?.id === activeRecord.id) {
+        setSavedRecord(updated);
+      }
+      setSearchResults((prev) =>
+        prev ? prev.map((r) => (r.id === activeRecord.id ? updated : r)) : prev
+      );
+
       setIsEditing(false);
+      setActiveRecord(null);
     } catch (err) {
       console.error(err?.response?.data || err.message);
       setSnackbar({ open: true, message: 'Failed to update record.', severity: 'error' });
@@ -436,21 +516,58 @@ function EquipmentMaintenance() {
   };
 
   const handleDelete = async () => {
-    if (!savedRecord) return;
+    if (!activeRecord) return;
     try {
-      await axios.delete(`${API_BASE}/maintenance-records/${savedRecord.id}`);
+      await axios.delete(`${API_BASE}/maintenance-records/${activeRecord.id}`);
       setSnackbar({ open: true, message: 'Record deleted.', severity: 'success' });
-      setSavedRecord(null);
+
+      if (savedRecord?.id === activeRecord.id) {
+        setSavedRecord(null);
+      }
+      setSearchResults((prev) =>
+        prev ? prev.filter((r) => r.id !== activeRecord.id) : prev
+      );
     } catch (err) {
       console.error(err?.response?.data || err.message);
       setSnackbar({ open: true, message: 'Failed to delete record.', severity: 'error' });
     } finally {
       setConfirmingDelete(false);
+      setActiveRecord(null);
     }
   };
 
+  const handleSearchByDate = async () => {
+    if (!searchDate) return;
+    setSearchLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE}/maintenance-records`, {
+        params: { date: searchDate },
+      });
+      setSearchResults(res.data);
+      if (!res.data || res.data.length === 0) {
+        setSnackbar({ open: true, message: 'No records found for that date.', severity: 'info' });
+      }
+    } catch (err) {
+      console.error(err?.response?.data || err.message);
+      setSnackbar({ open: true, message: 'Failed to fetch records for that date.', severity: 'error' });
+      setSearchResults(null);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const openEdit = (record) => {
+    setActiveRecord(record);
+    setIsEditing(true);
+  };
+
+  const openDeleteConfirm = (record) => {
+    setActiveRecord(record);
+    setConfirmingDelete(true);
+  };
+
   return (
-    <Box sx={{ maxWidth: 1080, mx: 'auto' }}>
+    <Box sx={{ width: '100%' }}>
       <Stack spacing={2}>
         <Card
           sx={{
@@ -495,61 +612,71 @@ function EquipmentMaintenance() {
               </Typography>
             </Stack>
 
-            <TableContainer>
-              <Table size="small">
-                <TableHead sx={{ bgcolor: tokens.amberTint }}>
-                  <TableRow>
-                    {SAVED_TABLE_FIELDS.map((f) => (
-                      <TableCell key={f.key} sx={{ color: tokens.amberDark, fontWeight: 700, whiteSpace: 'nowrap', py: 1 }}>
-                        {f.label}
-                      </TableCell>
-                    ))}
-                    <TableCell sx={{ color: tokens.amberDark, fontWeight: 700, py: 1, whiteSpace: 'nowrap' }} align="right">
-                      Actions
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  <TableRow hover>
-                    {SAVED_TABLE_FIELDS.map((f) => (
-                      <TableCell
-                        key={f.key}
-                        sx={{
-                          py: 1,
-                          whiteSpace: f.key === 'date' ? 'nowrap' : 'normal',
-                          verticalAlign: 'middle',
-                        }}
-                      >
-                        {f.key === 'amount' ? `₹${savedRecord[f.key]}` : savedRecord[f.key]}
-                      </TableCell>
-                    ))}
-                    <TableCell align="right" sx={{ py: 0.5, whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
-                      <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
-                        <IconButton size="small" onClick={() => setIsEditing(true)} sx={{ color: tokens.steel }}>
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" onClick={() => setConfirmingDelete(true)} sx={{ color: tokens.danger }}>
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
+            <RecordsTable records={[savedRecord]} onEdit={openEdit} onDelete={openDeleteConfirm} />
           </Card>
         )}
+
+        {/* Find & Edit Previous Records — pick any date and pull up what
+            was saved that day, independent of the current session. */}
+        <Card
+          sx={{
+            borderRadius: '16px',
+            border: `1px solid ${tokens.line}`,
+            boxShadow: '0 1px 2px rgba(38,33,27,0.04)',
+            overflow: 'hidden',
+          }}
+        >
+          <Box sx={{ p: 2, pb: searchResults ? 1 : 2 }}>
+            <SectionHeader icon={<HistoryIcon fontSize="small" />} title="Find & Edit Previous Records" />
+            <Grid container spacing={1.5} alignItems="center">
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <TextField
+                  fullWidth
+                  label="Date"
+                  type="date"
+                  value={searchDate}
+                  onChange={(e) => setSearchDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <Button
+                  variant="contained"
+                  startIcon={searchLoading ? <CircularProgress size={16} color="inherit" /> : <SearchIcon />}
+                  onClick={handleSearchByDate}
+                  disabled={!searchDate || searchLoading}
+                  fullWidth
+                >
+                  {searchLoading ? 'Searching…' : 'Find Records'}
+                </Button>
+              </Grid>
+            </Grid>
+          </Box>
+
+          {searchResults && searchResults.length > 0 && (
+            <RecordsTable records={searchResults} onEdit={openEdit} onDelete={openDeleteConfirm} />
+          )}
+
+          {searchResults && searchResults.length === 0 && (
+            <Typography sx={{ color: tokens.muted, px: 2, pb: 2, fontSize: '0.9rem' }}>
+              No records found for {searchDate}.
+            </Typography>
+          )}
+        </Card>
       </Stack>
 
-      {/* Edit dialog — reuses the exact same form as the add form above */}
+      {/* Edit dialog — reuses the exact same form as the add form above,
+          and now works for the just-saved record OR any row pulled up
+          from a previous date's search results. */}
       <Dialog open={isEditing} onClose={() => setIsEditing(false)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700 }}>
           Edit Maintenance Record
         </DialogTitle>
         <DialogContent dividers sx={{ borderColor: tokens.line }}>
-          {savedRecord && (
+          {activeRecord && (
             <RecordForm
-              initialValues={savedRecord}
+              key={activeRecord.id}
+              initialValues={activeRecord}
               departments={departments}
               categories={categories}
               onSubmit={handleUpdate}
@@ -567,8 +694,8 @@ function EquipmentMaintenance() {
         </DialogTitle>
         <DialogContent>
           <Typography sx={{ color: tokens.muted }}>
-            This will permanently delete the {savedRecord?.equipment} maintenance entry from{' '}
-            {savedRecord?.date}. This can't be undone.
+            This will permanently delete the {activeRecord?.equipment} maintenance entry from{' '}
+            {activeRecord?.date}. This can't be undone.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
