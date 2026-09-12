@@ -143,7 +143,7 @@ function Login() {
           >
             <img
               src="/logo.jpeg"
-              alt="Govinda's Srinathji Bhavan"
+              
               style={{
                 width: '100%',
                 height: '100%',
@@ -161,9 +161,7 @@ function Login() {
               mb: 2,
             }}
           >
-            Govinda's
             <br />
-            Srinathji Bhavan
           </Typography>
 
           <Typography
@@ -440,7 +438,7 @@ function Login() {
               mt: 5,
             }}
           >
-            © {new Date().getFullYear()} Govinda's Srinathji Bhavan
+            © {new Date().getFullYear()} Facility Management Department. All rights reserved.
           </Typography>
         </Paper>
       </Box>
