@@ -1,17 +1,38 @@
 const express = require('express');
 const mysql = require('mysql');
 const cors = require('cors');
+require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 // MySQL connection
+// const db = mysql.createConnection({
+//   host: 'localhost',
+//   user: 'root',
+//   password: '1234',
+//   database: 'eqmaintenance'
+// });
+
 const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: '',
-  database: 'eqmaintenance'
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  ssl: {
+    rejectUnauthorized: true
+  }
+});
+
+db.connect((err) => {
+  if (err) {
+    console.error('TiDB connection failed:', err);
+    return;
+  }
+
+  console.log('Connected successfully to TiDB Cloud');
 });
 
 // ✔ User Management
@@ -371,7 +392,7 @@ app.post('/water-testing', (req, res) => {
     }
   );
 });
-app.listen(8081, "0.0.0.0", () => {
-  console.log("Server running on port 8081");
-});
-
+// app.listen(8081, "0.0.0.0", () => {
+//   console.log("Server running on port 8081");
+// });
+module.exports = app;
