@@ -1,0 +1,11 @@
+{
+  "buildCommand": "cd Maintenance && npm install && npm run build",
+  "outputDirectory": "Maintenance/dist",
+  "installCommand": "cd Maintenance && npm install",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "http://localhost:8081/$1"
+    }
+  ]
+}
