@@ -26,9 +26,6 @@ function Login() {
 
   const navigate = useNavigate();
 
-  // Get API URL from environment or use localhost for development
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
-
   const handleLogin = async (e) => {
     e.preventDefault();
 
@@ -36,7 +33,7 @@ function Login() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/login`, {
+      const response = await fetch('http://localhost:8081/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -146,7 +143,7 @@ function Login() {
           >
             <img
               src="/logo.jpeg"
-              alt="Maintenance Logo"
+              
               style={{
                 width: '100%',
                 height: '100%',
@@ -253,6 +250,7 @@ function Login() {
             }}
           >
             Welcome Back
+            
           </Typography>
 
           <Typography
