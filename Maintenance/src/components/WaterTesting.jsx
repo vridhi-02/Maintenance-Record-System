@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+  import React, { useState, useEffect, useMemo } from 'react';
+import { API_BASE } from '../config';
 import {
   Box,
   Card,
@@ -49,7 +50,7 @@ export default function WaterTesting() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
-    fetch('http://localhost:8081/water-testing')
+    fetch(`${API_BASE}/water-testing`)
       .then((res) => {
         if (!res.ok) {
           throw new Error(`Server responded ${res.status}`);
@@ -84,7 +85,7 @@ export default function WaterTesting() {
       return;
     }
 
-    fetch('http://localhost:8081/water-testing', {
+    fetch(`${API_BASE}/water-testing`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),

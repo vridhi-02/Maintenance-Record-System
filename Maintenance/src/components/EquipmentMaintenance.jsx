@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { API_BASE } from '../config';
 import axios from 'axios';
 import {
   Box,
@@ -39,7 +40,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import HistoryIcon from '@mui/icons-material/History';
 import { tokens } from './theme';
 
-const API_BASE = 'http://localhost:8081';
 
 const TYPE_OF_WORK_OPTIONS = ['PM', 'CM', 'Service', 'Installation'];
 const HRS_OPTIONS = ['1', '2', '3'];
