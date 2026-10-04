@@ -1,5 +1,5 @@
 const express = require('express');
-const mysql = require('mysql');
+const mysql = require('mysql2');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -7,33 +7,24 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// MySQL connection
-// const db = mysql.createConnection({
-//   host: 'localhost',
-//   user: 'root',
-//   password: '1234',
-//   database: 'eqmaintenance'
-// });
-
-const db = mysql.createConnection({
+const db = mysql.createPool({
   host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
+  port: Number(process.env.DB_PORT) || 4000,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  ssl: {
-    rejectUnauthorized: true
-  }
+  ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: true },
+  waitForConnections: true,
+  connectionLimit: 5,
 });
 
-db.connect((err) => {
-  if (err) {
-    console.error('TiDB connection failed:', err);
-    return;
-  }
-
+db.getConnection((err, conn) => {
+  if (err) return console.error('TiDB connection failed:', err);
   console.log('Connected successfully to TiDB Cloud');
+  conn.release();
 });
+
+app.get('/', (req, res) => res.send('API is running'));
 
 // ✔ User Management
 app.get('/users', (req, res) => {
@@ -60,7 +51,6 @@ app.post('/login', (req, res) => {
   const sql = "SELECT * FROM users WHERE username = ? AND password = ?";
   db.query(sql, [username, password], (err, results) => {
     if (err) return res.status(500).json({ error: "Server error" });
-    console.error("Login query error:", err);
     if (results.length === 0) return res.status(401).json({ error: "Invalid credentials" });
     const user = results[0];
     res.json({ id: user.id, username: user.username, role: user.role });
@@ -392,7 +382,7 @@ app.post('/water-testing', (req, res) => {
     }
   );
 });
-app.listen(8081, "0.0.0.0", () => {
-  console.log("Server running on port 8081");
+const PORT = process.env.PORT || 8081;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("Server running on port " + PORT);
 });
-module.exports = app;

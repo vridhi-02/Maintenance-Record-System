@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_BASE } from '../config';
 import axios from 'axios';
 import {
   Box,
@@ -85,14 +86,14 @@ function EquipmentMaintenance() {
 
   // Fetch departments for dropdown
   useEffect(() => {
-    axios.get('http://localhost:8081/departments')
+    axios.get(`${API_BASE}/departments`)
       .then((res) => setDepartments(res.data))
       .catch((err) => console.error('Error fetching departments:', err));
   }, []);
 
   // Fetch categories for dropdown (independent of machinery/department)
   useEffect(() => {
-    axios.get('http://localhost:8081/categories')
+    axios.get(`${API_BASE}/categories`)
       .then((res) => setCategories(res.data))
       .catch((err) => console.error('Error fetching categories:', err));
   }, []);
@@ -107,7 +108,7 @@ function EquipmentMaintenance() {
     const deptObj = departments.find((d) => d.dept_Name === selectedDepartment);
     if (!deptObj) return;
 
-    axios.get(`http://localhost:8081/machinery?department_id=${deptObj.dept_Id}`)
+    axios.get(`${API_BASE}/machinery?department_id=${deptObj.dept_Id}`)
       .then((res) => setMachineryList(res.data))
       .catch((err) => console.error('Error fetching machinery:', err));
   }, [selectedDepartment, departments]);
@@ -126,7 +127,7 @@ function EquipmentMaintenance() {
       return;
     }
 
-    axios.get(`http://localhost:8081/machine-numbers?machinery_id=${machineryObj.id}`)
+    axios.get(`${API_BASE}/machine-numbers?machinery_id=${machineryObj.id}`)
       .then((res) => setMachineNumberOptions(res.data))
       .catch((err) => console.error('Error fetching machine numbers:', err));
   }, [selectedMachinery, machineryList]);
@@ -161,7 +162,7 @@ function EquipmentMaintenance() {
     };
 
     try {
-      const res = await axios.post('http://localhost:8081/maintenance-records', payload);
+      const res = await axios.post(`${API_BASE}/maintenance-records`, payload);
 
       if (res.status === 201) {
         setSnackbar({ open: true, message: 'Maintenance record saved successfully!', severity: 'success' });

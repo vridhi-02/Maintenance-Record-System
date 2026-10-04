@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE } from '../config';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -33,7 +34,7 @@ function Login() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8081/users', {
+      const response = await fetch(`${API_BASE}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

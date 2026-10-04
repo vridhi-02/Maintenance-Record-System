@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { API_BASE } from '../config';
 import axios from 'axios';
 import {
   Box,
@@ -57,7 +58,7 @@ function MaintenanceRecord() {
 
   useEffect(() => {
     axios
-      .get('http://localhost:8081/maintenance-records')
+      .get(`${API_BASE}/maintenance-records`)
       .then((res) => {
         const data = Array.isArray(res.data) ? res.data : [];
         const sorted = [...data].sort((a, b) => new Date(b.date) - new Date(a.date));
