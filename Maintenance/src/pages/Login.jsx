@@ -172,7 +172,7 @@ function Login() {
               lineHeight: 1.7,
             }}
           >
-            Welcome to the Maintenance Management Portal !!Hare Krsna!!.
+            Welcome to the Maintenance Management Portal !!Hare Krsna!!.........
             <br />
             Please sign in to continue.
           </Typography>
