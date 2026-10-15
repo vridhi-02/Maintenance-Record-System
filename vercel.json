@@ -1,6 +1,0 @@
-{
-  "buildCommand": "cd Maintenance && npm install && npm run build",
-  "outputDirectory": "Maintenance/dist",
-  "installCommand": "cd Maintenance && npm install",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
-} 
